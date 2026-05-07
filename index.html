@@ -1,0 +1,1259 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; font-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>One Page PII Redactor</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #090b10;
+      --panel: #11151d;
+      --panel-strong: #161b24;
+      --ink: #f4f7fb;
+      --muted: #9aa4b2;
+      --line: #252b36;
+      --line-strong: #3a4352;
+      --accent: #fb7185;
+      --accent-soft: rgba(251, 113, 133, 0.14);
+      --accent-line: #fb7185;
+      --ok: #5eead4;
+      --warn: #fda4af;
+      --shadow: 0 24px 80px rgba(0, 0, 0, 0.36);
+      --radius: 8px;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+    }
+
+    body {
+      background:
+        radial-gradient(circle at 50% -20%, rgba(251, 113, 133, 0.18), transparent 34rem),
+        linear-gradient(180deg, #0d1017 0, #090b10 24rem),
+        var(--bg);
+      color: var(--ink);
+    }
+
+    button,
+    textarea,
+    .editor {
+      font: inherit;
+    }
+
+    .app {
+      height: 100vh;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      overflow: hidden;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 18px 28px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(9, 11, 16, 0.78);
+      backdrop-filter: blur(18px);
+      z-index: 2;
+    }
+
+    .brand {
+      min-width: 0;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 20px;
+      line-height: 1.15;
+      letter-spacing: 0;
+    }
+
+    .subhead {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.35;
+    }
+
+    .local-note {
+      margin: 6px 0 0;
+      color: #7f8a9a;
+      font-size: 12px;
+      line-height: 1.3;
+    }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .auto-copy-toggle {
+      min-height: 38px;
+      margin-left: 8px;
+      border: 1px solid var(--line-strong);
+      border-radius: 7px;
+      background: #151a23;
+      color: var(--ink);
+      padding: 8px 11px 8px 10px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+      font-size: 13px;
+      line-height: 1;
+      transition: border-color 120ms ease, background 120ms ease, color 120ms ease;
+    }
+
+    .auto-copy-toggle:hover {
+      border-color: #566174;
+      color: var(--ink);
+      background: #1d2330;
+    }
+
+    .auto-copy-toggle input {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      margin: 0;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .toggle-switch {
+      width: 30px;
+      height: 18px;
+      border: 1px solid #4b5565;
+      border-radius: 999px;
+      background: #0f131b;
+      position: relative;
+      flex: 0 0 auto;
+      transition: border-color 120ms ease, background 120ms ease;
+    }
+
+    .toggle-switch::after {
+      content: "";
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: #8b96a8;
+      transition: transform 120ms ease, background 120ms ease;
+    }
+
+    .auto-copy-toggle input:checked + .toggle-switch {
+      border-color: #fb7185;
+      background: rgba(225, 29, 72, 0.38);
+    }
+
+    .auto-copy-toggle input:checked + .toggle-switch::after {
+      transform: translateX(12px);
+      background: #ffe4e6;
+    }
+
+    .auto-copy-toggle:focus-within {
+      outline: 2px solid rgba(251, 113, 133, 0.3);
+      outline-offset: 2px;
+    }
+
+    .button {
+      min-height: 38px;
+      border: 1px solid var(--line-strong);
+      border-radius: 7px;
+      background: #151a23;
+      color: var(--ink);
+      padding: 8px 12px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: border-color 120ms ease, background 120ms ease, color 120ms ease, transform 120ms ease;
+      user-select: none;
+      white-space: nowrap;
+    }
+
+    .button:hover {
+      border-color: #566174;
+      background: #1d2330;
+    }
+
+    .button:active {
+      transform: translateY(1px);
+    }
+
+    .button.primary {
+      border-color: #fb7185;
+      background: #e11d48;
+      color: white;
+    }
+
+    .button.primary:hover {
+      background: #be123c;
+      border-color: #fda4af;
+    }
+
+    .button.icon {
+      width: 38px;
+      padding: 0;
+    }
+
+    .button[disabled] {
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .button.primary[disabled],
+    .button.primary[disabled]:hover {
+      border-color: var(--line-strong);
+      background: #151a23;
+      color: #6f7a8a;
+      opacity: 1;
+    }
+
+    .main {
+      width: min(1480px, 100%);
+      min-height: 0;
+      margin: 0 auto;
+      padding: 14px 28px;
+      display: grid;
+    }
+
+    .workspace {
+      min-height: 0;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      display: grid;
+      grid-template-rows: 1fr;
+      overflow: hidden;
+    }
+
+    .editor {
+      width: 100%;
+      height: 100%;
+      min-height: 0;
+      border: 0;
+      outline: 0;
+      padding: 22px;
+      background: #0f131b;
+      color: var(--ink);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size: 15px;
+      line-height: 1.72;
+      letter-spacing: 0;
+      overflow: auto;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      caret-color: var(--accent);
+      cursor: text;
+    }
+
+    textarea.editor {
+      resize: none;
+    }
+
+    .redaction-view[hidden],
+    .editor-input[hidden] {
+      display: none;
+    }
+
+    .editor:empty::before {
+      content: attr(data-placeholder);
+      color: #657080;
+      pointer-events: none;
+    }
+
+    .redaction {
+      appearance: none;
+      border: 1px solid var(--accent-line);
+      border-radius: 5px;
+      background: var(--accent-soft);
+      color: #ffe4e6;
+      padding: 1px 5px 2px;
+      margin: 0 1px;
+      cursor: pointer;
+      font: inherit;
+      line-height: 1.45;
+      position: relative;
+      display: inline-block;
+      box-shadow: inset 0 -1px 0 rgba(244, 63, 94, 0.18);
+    }
+
+    .redaction:hover,
+    .redaction:focus-visible {
+      background: rgba(251, 113, 133, 0.26);
+      outline: 2px solid rgba(251, 113, 133, 0.28);
+      outline-offset: 1px;
+    }
+
+    .redaction::after {
+      content: attr(data-reveal);
+      position: absolute;
+      left: 50%;
+      top: calc(100% + 8px);
+      z-index: 4;
+      width: max-content;
+      max-width: min(360px, 70vw);
+      padding: 8px 10px;
+      border: 1px solid #475569;
+      border-radius: 7px;
+      background: #f8fafc;
+      color: #0f172a;
+      box-shadow: 0 14px 40px rgba(0, 0, 0, 0.34);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 12px;
+      line-height: 1.35;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      opacity: 0;
+      pointer-events: none;
+      transform: translate(-50%, -4px);
+      transition: opacity 100ms ease, transform 100ms ease;
+    }
+
+    .redaction:hover::after,
+    .redaction:focus-visible::after {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
+
+    .redaction.restored {
+      border-color: #5eead4;
+      background: rgba(20, 184, 166, 0.16);
+      color: #ccfbf1;
+    }
+
+    .statusbar {
+      z-index: 3;
+      border-top: 1px solid var(--line);
+      background: rgba(9, 11, 16, 0.86);
+      backdrop-filter: blur(18px);
+      padding: 11px 28px;
+    }
+
+    .status-inner {
+      width: min(1480px, 100%);
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .status {
+      min-width: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.35;
+    }
+
+    .status strong {
+      color: var(--ink);
+    }
+
+    .copy-state {
+      color: var(--ok);
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .copy-state:not(:empty) {
+      animation: copyFlash 1600ms ease both;
+    }
+
+    .copy-state:empty {
+      display: none;
+    }
+
+    .copy-state.warn {
+      color: var(--warn);
+    }
+
+    @keyframes copyFlash {
+      0% {
+        opacity: 0;
+        transform: translateY(3px);
+      }
+      12%,
+      78% {
+        opacity: 1;
+        transform: translateY(0);
+      }
+      100% {
+        opacity: 0;
+        transform: translateY(-2px);
+      }
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    @media (max-width: 860px) {
+      .topbar,
+      .status-inner {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
+      .toolbar {
+        justify-content: flex-start;
+      }
+
+      .main {
+        padding: 12px 14px;
+      }
+
+      .copy-state {
+        white-space: normal;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <h1>One Page PII Redactor</h1>
+        <p class="subhead">Paste text. Automatically redacted. Hover to view redaction. Click to undo redactions.</p>
+        <p class="local-note">One self-contained file. No network requests. Completely local.</p>
+      </div>
+      <div class="toolbar" aria-label="Actions">
+        <button class="button" id="pasteButton" type="button" title="Paste from clipboard" aria-label="Paste from clipboard">
+          <span aria-hidden="true">Paste</span>
+        </button>
+        <button class="button primary" id="copyButton" type="button" title="Copy redacted text" aria-label="Copy redacted text">
+          <span aria-hidden="true">Copy</span>
+        </button>
+        <button class="button" id="clearButton" type="button" title="Clear text" aria-label="Clear text">
+          <span aria-hidden="true">Clear</span>
+        </button>
+        <label class="auto-copy-toggle" aria-label="Automatically copy redacted text">
+          <input id="autoCopyToggle" type="checkbox" checked>
+          <span class="toggle-switch" aria-hidden="true"></span>
+          <span>Auto-copy</span>
+        </label>
+      </div>
+    </header>
+
+    <main class="main">
+      <section class="workspace" aria-label="PII redaction editor">
+        <textarea
+          class="editor editor-input"
+          id="editorInput"
+          spellcheck="false"
+          autocapitalize="off"
+          placeholder="Paste text here."
+        ></textarea>
+        <div
+          class="editor redaction-view"
+          id="redactionBox"
+          data-placeholder="Paste text here."
+          hidden
+        ></div>
+      </section>
+    </main>
+
+    <footer class="statusbar">
+      <div class="status-inner">
+        <div class="status" id="statusText"><strong>0</strong> characters, <strong>0</strong> redactions</div>
+        <div class="copy-state" id="copyState"></div>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const editorInput = document.getElementById("editorInput");
+      const redactionBox = document.getElementById("redactionBox");
+      const statusText = document.getElementById("statusText");
+      const copyState = document.getElementById("copyState");
+      const copyButton = document.getElementById("copyButton");
+      const pasteButton = document.getElementById("pasteButton");
+      const clearButton = document.getElementById("clearButton");
+      const autoCopyToggle = document.getElementById("autoCopyToggle");
+
+      const redactions = new Map();
+      const restoredIds = new Set();
+      let currentResult = null;
+      let rawSourceText = "";
+      let redactedPlainText = "";
+      let autoCopyTimer = 0;
+      let copyStateTimer = 0;
+      let inputRenderTimer = 0;
+      const autoCopyStorageKey = "one-page-pii-redactor:auto-copy";
+
+      const detectors = [
+        {
+          type: "EMAIL",
+          label: "email address",
+          pattern: /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi
+        },
+        {
+          type: "SSN",
+          label: "SSN",
+          pattern: /\b\d{3}[- ]?\d{2}[- ]?\d{4}\b/g
+        },
+        {
+          type: "CREDIT_CARD",
+          label: "card number",
+          pattern: /\b(?:card(?:holder)?|card number|card on file|amex|visa|mastercard)\b[^\d]{0,24}((?:\d[ -]*?){13,19})\b/gi,
+          group: 1,
+          validate: (value) => value.replace(/\D/g, "").length >= 13
+        },
+        {
+          type: "CREDIT_CARD",
+          label: "card number",
+          pattern: /\b(?:\d[ -]*?){13,19}\b/g,
+          validate: (value) => luhn(value.replace(/\D/g, ""))
+        },
+        {
+          type: "PHONE",
+          label: "phone number",
+          pattern: /(?<!\w)(?:\+?1[\s.-]?)?(?:\(\d{3}\)|\d{3})[\s.-]?\d{3}[\s.-]?\d{4}(?:\s*(?:x|ext\.?|extension)\s*\d{1,6})?(?!\w)/gi,
+          validate: (value) => value.replace(/\D/g, "").length >= 10
+        },
+        {
+          type: "IP_ADDRESS",
+          label: "IP address",
+          pattern: /\b(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)\b/g
+        },
+        {
+          type: "IP_ADDRESS",
+          label: "IP address",
+          pattern: /\b(?:[A-F0-9]{1,4}:){2,7}[A-F0-9]{0,4}\b/gi
+        },
+        {
+          type: "URL",
+          label: "URL",
+          pattern: /\bhttps?:\/\/[^\s<>"']+/gi
+        },
+        {
+          type: "DATE_OF_BIRTH",
+          label: "date of birth",
+          pattern: /\b(?:DOB|D\.O\.B\.|date of birth|birth date|born)["']?[ \t]*(?:is|[:=#-])?[ \t]*["']?(\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}[/-]\d{1,2}[/-]\d{1,2}|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.?[ \t]+\d{1,2},?[ \t]+\d{4})\b/gi,
+          group: 1
+        },
+        {
+          type: "DATE_OF_BIRTH",
+          label: "date of birth",
+          pattern: /\b(?:\d{1,2}[/-]\d{1,2}[/-](?:19|20)\d{2}|(?:19|20)\d{2}[/-]\d{1,2}[/-]\d{1,2})\b/g,
+          validate: (_value, text, start) => !/\brelease date\s*$/i.test(text.slice(Math.max(0, start - 24), start))
+        },
+        {
+          type: "ADDRESS",
+          label: "street address",
+          pattern: /\b\d{1,6}[ \t]+(?:[NSEW]\.?|North|South|East|West|NE|NW|SE|SW)?[ \t]*(?:[A-Z][a-z0-9.'-]*[ \t]+){0,7}(?:Street|St\.?|Avenue|Ave\.?|Road|Rd\.?|Boulevard|Blvd\.?|Drive|Dr\.?|Lane|Ln\.?|Court|Ct\.?|Circle|Cir\.?|Way|Parkway|Pkwy\.?|Place|Pl\.?|Terrace|Ter\.?)\b(?:,?[ \t]*(?:Apt|Apartment|Unit|Suite|Ste|#)[ \t]*[A-Z0-9-]+)?(?:,?[ \t]+[A-Z][a-z]+(?:[ \t]+[A-Z][a-z]+){0,3},?[ \t]+[A-Z]{2}[ \t]+\d{5}(?:-\d{4})?)?/g
+        },
+        {
+          type: "LOCATION",
+          label: "location",
+          pattern: /\b[A-Z][a-z]+(?:[ \t]+[A-Z][a-z]+){0,2},[ \t]+[A-Z]{2}[ \t]+\d{5}(?:-\d{4})?\b/g
+        },
+        {
+          type: "TOKEN",
+          label: "secret token",
+          pattern: /\bBearer[ \t]+([A-Z0-9._~+/=-]{10,})\b/gi,
+          group: 1
+        },
+        {
+          type: "TOKEN",
+          label: "secret token",
+          pattern: /\b(?:[a-z0-9_]*password|api[_-]?key|access[_-]?token|session[_-]?token|signing[_-]?secret|token|secret|passwd|pwd|csrf)\b["']?[ \t]*(?:is|[:=])?[ \t]*["']?([^"'\s,;}{]{6,})/gi,
+          group: 1
+        },
+        {
+          type: "SSN",
+          label: "SSN",
+          pattern: /\bSSN[ \t]+last4[ \t:=-]*(\d{4})\b/gi,
+          group: 1
+        },
+        {
+          type: "CARD_EXPIRY",
+          label: "card expiry",
+          pattern: /\b(?:exp|expires|expiry)[ \t:=-]*(\d{1,2}\/\d{2,4})\b/gi,
+          group: 1
+        },
+        {
+          type: "ACCOUNT",
+          label: "account number",
+          pattern: /\b(?:account|acct|acct_id|customer_id|customer id|vendor[ \t]*id|member(?:[ \t]*id)?|employee[ \t]*id|badge[ \t]+member[ \t]*id|routing(?:[ \t]+account[ \t]+ref)?|iban|mrn|patient[ \t]*(?:id|no|number)?|patient_no|policy|checking[ \t]+account|target_account)\s*(?:number|no\.?|ref|#|id)?\s*(?:[:=#-])?[ \t]*["']?([A-Z0-9][A-Z0-9_-]{3,})\b/gi,
+          group: 1,
+          validate: (value) => /\d/.test(value) && value.replace(/[^A-Z0-9]/gi, "").length >= 5
+        },
+        {
+          type: "ACCOUNT",
+          label: "account number",
+          pattern: /["']?(?:patient_no|patient_id|member_id|account_id|target_account)["']?[ \t,:=]+["']([A-Z0-9][A-Z0-9_-]{3,})["']/gi,
+          group: 1,
+          validate: (value) => /\d/.test(value) && value.replace(/[^A-Z0-9]/gi, "").length >= 5
+        },
+        {
+          type: "ACCOUNT",
+          label: "account number",
+          pattern: /\b(?:ACCT?|ACC|CUST|MEMBER|MEM|MBR|MID|MRN|PT|PX|HN|EMP|EID|INS|HH|USR|TCK|VEND)[-_]?[A-Z0-9]+(?:[-_][A-Z0-9]+)*\b/g,
+          validate: (value) => /\d/.test(value) && value.replace(/[^A-Z0-9]/gi, "").length >= 5
+        },
+        {
+          type: "USERNAME",
+          label: "username",
+          pattern: /\b(?:username|user id|login)\s*[:#-]?\s*([A-Z0-9._-]{3,})\b/gi,
+          group: 1
+        },
+        {
+          type: "NAME",
+          label: "person name",
+          pattern: /\b(?:Mr\.|Mrs\.|Ms\.|Miss|Dr\.|Prof\.|Captain|Capt\.)[ \t]+(?:[A-Z]\.?|[A-Z][a-z]+(?:-[A-Z][a-z]+)?)(?:[ \t]+(?:[A-Z]\.?|[A-Z][a-z]+(?:-[A-Z][a-z]+)?)){0,3}\b/g
+        },
+        {
+          type: "NAME",
+          label: "person name",
+          pattern: /\b(?:(?:(?:full|legal|preferred|cardholder|customer|patient|applicant|employee|resident|primary|secondary)[ \t]+){0,3}name|patient|client|employee|contact|member|applicant|resident|cardholder)["']?[ \t]*(?:[:=#-])[ \t]*["']?((?:[A-Z]\.?|[A-Z][a-z]+(?:-[A-Z][a-z]+)?)(?:[ \t]+(?:[A-Z]\.?|[A-Z][a-z]+(?:-[A-Z][a-z]+)?)){0,3})\b/gi,
+          group: 1
+        },
+        {
+          type: "NAME",
+          label: "person name",
+          pattern: /\b(?:my name is|name is|patient is|client is|employee is|contact is|signed by|from|attorney|client|matched to|ship replacement badge to|escalate to|spoke with)[ \t]+((?:[A-Z]\.?|[A-Z][a-z]+(?:-[A-Z][a-z]+)?)(?:[ \t]+(?:[A-Z]\.?|[A-Z][a-z]+(?:-[A-Z][a-z]+)?)){1,3})\b/gi,
+          group: 1
+        },
+        {
+          type: "NAME",
+          label: "person name",
+          pattern: /\b(?:patient|customer|member|recipient|cardholder|user|contact|applicant|owner|for|as|formerly|nickname|belongs to|labels the user as|recorded customer as|mail the packet to|corrected invoice to)[ \t:"]+((?:[A-Z]\.?|[A-Z][a-z]+(?:-[A-Z][a-z]+)?)(?:[ \t]+(?:[A-Z]\.?|[A-Z][a-z]+(?:-[A-Z][a-z]+)?)){1,3})\b/gi,
+          group: 1
+        },
+        {
+          type: "NAME",
+          label: "person name",
+          pattern: /["']?(?:name|full_name|user)["']?[ \t,:=]+["']((?:[A-Z]\.?|[A-Z][a-z]+(?:-[A-Z][a-z]+)?)(?:[ \t]+(?:[A-Z]\.?|[A-Z][a-z]+(?:-[A-Z][a-z]+)?)){1,3})["']/g,
+          group: 1
+        },
+        {
+          type: "NAME",
+          label: "person name",
+          pattern: /:\s*((?:[A-Z]\.?|[A-Z][a-z]+(?:-[A-Z][a-z]+)?)(?:[ \t]+(?:[A-Z]\.?|[A-Z][a-z]+(?:-[A-Z][a-z]+)?)){1,3})(?=,|\.|\s+also\b|\s+used\b)/g,
+          group: 1
+        },
+        {
+          type: "NAME",
+          label: "person name",
+          pattern: /\band\s+((?:[A-Z]\.?|[A-Z][a-z]+(?:-[A-Z][a-z]+)?)(?:[ \t]+(?:[A-Z]\.?|[A-Z][a-z]+(?:-[A-Z][a-z]+)?)){1,3})\s+in the signature\b/g,
+          group: 1
+        },
+        {
+          type: "ADDRESS",
+          label: "street address",
+          pattern: /\bP\.?\s*O\.?\s*Box\s+\d{1,8},?\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2},?\s+[A-Z]{2}\s+\d{5}(?:-\d{4})?\b/g
+        },
+        {
+          type: "NAME",
+          label: "person name",
+          pattern: /(?:^|[\n,])([A-Z][a-z]+(?:-[A-Z][a-z]+)?[ \t]+(?:[A-Z]\.?|[A-Z][a-z]+(?:-[A-Z][a-z]+)?))(?=,)/g,
+          group: 1
+        },
+        {
+          type: "NAME",
+          label: "person name",
+          pattern: /\b(?:Name|Full name|Legal name|Preferred name|Customer Name|Patient|Client|Employee|Contact|Member|Applicant|Resident|Recipient|Cardholder)[ \t]*(?:[:=#-])[ \t]*["']?((?:\p{Lu}[\p{L}\p{M}'-]+|[A-Z]\.?|de|del|de la|da|das|dos|van|von|bin|bint|al|el|la|le|du)(?:[ \t]+(?:\p{Lu}[\p{L}\p{M}'-]+|[A-Z]\.?|de|del|de la|da|das|dos|van|von|bin|bint|al|el|la|le|du)){1,5})\b/gu,
+          group: 1
+        },
+        {
+          type: "NAME",
+          label: "person name",
+          pattern: /(?:^|\n)[ \t]*((?:[A-Z][a-z]+(?:[-'][A-Z][a-z]+)?|[A-Z]\.?)(?:[ \t]+(?:[A-Z][a-z]+(?:[-'][A-Z][a-z]+)?|[A-Z]\.?)){1,3})[ \t]*(?=$|\n)/g,
+          group: 1,
+          validate: (value) => looksLikeBarePersonName(value)
+        },
+        {
+          type: "NAME",
+          label: "person name",
+          pattern: /(?:^|\n)[ \t]*((?:\p{Lu}[\p{L}\p{M}'-]+|[A-Z]\.?|de|del|da|das|dos|van|von|bin|bint|al|el|la|le|du)(?:[ \t]+(?:\p{Lu}[\p{L}\p{M}'-]+|[A-Z]\.?|de|del|da|das|dos|van|von|bin|bint|al|el|la|le|du)){1,5})[ \t]*(?=$|\n)/gu,
+          group: 1,
+          validate: (value) => looksLikeBarePersonName(value)
+        }
+      ];
+
+      const placeholderLabels = {
+        ACCOUNT: "Account",
+        ADDRESS: "Address",
+        CARD_EXPIRY: "Expiry",
+        CREDIT_CARD: "Card",
+        DATE_OF_BIRTH: "DOB",
+        EMAIL: "Email",
+        IP_ADDRESS: "IP",
+        LOCATION: "Location",
+        NAME: "Person",
+        PHONE: "Phone",
+        SSN: "SSN",
+        TOKEN: "Secret",
+        URL: "URL",
+        USERNAME: "Username",
+        ZIP: "ZIP"
+      };
+
+      const placeholderCounts = new Map();
+      const placeholderByValue = new Map();
+      const bareNameBlockedWords = new Set([
+        "account",
+        "address",
+        "api",
+        "application",
+        "billing",
+        "browser",
+        "business",
+        "card",
+        "checkout",
+        "company",
+        "deployment",
+        "details",
+        "document",
+        "draft",
+        "employee",
+        "firmware",
+        "guide",
+        "invoice",
+        "order",
+        "payment",
+        "policy",
+        "practical",
+        "product",
+        "profile",
+        "release",
+        "report",
+        "review",
+        "roadmap",
+        "security",
+        "shipping",
+        "support",
+        "system",
+        "ticket",
+        "workflow"
+      ]);
+
+      function luhn(value) {
+        if (!/^\d{13,19}$/.test(value)) return false;
+        let sum = 0;
+        let doubleDigit = false;
+        for (let i = value.length - 1; i >= 0; i -= 1) {
+          let digit = Number(value[i]);
+          if (doubleDigit) {
+            digit *= 2;
+            if (digit > 9) digit -= 9;
+          }
+          sum += digit;
+          doubleDigit = !doubleDigit;
+        }
+        return sum % 10 === 0;
+      }
+
+      function nextPlaceholder(type, value) {
+        const key = `${type}\u0000${value.toLowerCase()}`;
+        if (placeholderByValue.has(key)) return placeholderByValue.get(key);
+        const count = (placeholderCounts.get(type) || 0) + 1;
+        placeholderCounts.set(type, count);
+        const label = placeholderLabels[type] || type.replace(/_/g, " ");
+        const placeholder = `${label} ${count}`;
+        placeholderByValue.set(key, placeholder);
+        return placeholder;
+      }
+
+      function looksLikeBarePersonName(value) {
+        const tokens = value
+          .trim()
+          .split(/\s+/)
+          .map((token) => token.replace(/\.$/, "").toLowerCase());
+        if (tokens.length < 2 || tokens.length > 4) return false;
+        if (tokens.every((token) => token.length === 1)) return false;
+        return !tokens.some((token) => bareNameBlockedWords.has(token));
+      }
+
+      function resolveNamePlaceholders(matches) {
+        const assignments = new Map();
+        const mentions = matches
+          .map((match, index) => ({ index, match, name: parseName(match.value) }))
+          .filter((mention) => mention.match.type === "NAME" && mention.name);
+        const clusters = [];
+
+        for (const mention of mentions) {
+          if (mention.name.strength !== "anchor") continue;
+          let cluster = clusters.find((item) => sameAnchorPerson(item.anchor, mention.name));
+          if (!cluster) {
+            cluster = {
+              anchor: mention.name,
+              placeholder: nextPersonPlaceholder()
+            };
+            clusters.push(cluster);
+          }
+          assignments.set(mention.index, cluster.placeholder);
+        }
+
+        for (const mention of mentions) {
+          if (assignments.has(mention.index)) continue;
+          const target = mention.name.strength === "alias" || mention.name.strength === "weakAlias"
+            ? findUniqueAliasTarget(mention.name, clusters)
+            : null;
+          assignments.set(mention.index, target ? target.placeholder : nextPersonPlaceholder());
+        }
+
+        return assignments;
+      }
+
+      function nextPersonPlaceholder() {
+        const count = (placeholderCounts.get("NAME") || 0) + 1;
+        placeholderCounts.set("NAME", count);
+        return `Person ${count}`;
+      }
+
+      function parseName(value) {
+        const cleaned = value
+          .replace(/\b(?:mr|mrs|ms|miss|dr|prof|captain|capt)\.?\b/gi, "")
+          .replace(/[^\p{L}\p{M} .'-]/gu, " ")
+          .replace(/\s+/g, " ")
+          .trim()
+          .toLowerCase();
+        const tokens = cleaned.split(" ").filter(Boolean).map((token) => token.replace(/\.$/, ""));
+        if (tokens.length === 0) return null;
+        const first = tokens[0];
+        const last = tokens[tokens.length - 1];
+        const fullFirst = isFullNameToken(first);
+        const fullLast = tokens.length > 1 && isFullNameToken(last);
+        const hasFirstInitialOnly = isInitialToken(first);
+        const hasLastInitialOnly = tokens.length > 1 && isInitialToken(last);
+        const middleInitial = tokens.slice(1, -1).find((token) => isInitialToken(token)) || "";
+        const parsed = {
+          raw: tokens.join(" "),
+          tokens,
+          first,
+          last,
+          fullFirst,
+          fullLast,
+          hasFirstInitialOnly,
+          hasLastInitialOnly,
+          middleInitial: middleInitial ? middleInitial[0] : ""
+        };
+        parsed.strength = classifyName(parsed);
+        return parsed;
+      }
+
+      function isFullNameToken(token) {
+        return /^\p{Ll}[\p{L}\p{M}'-]{1,}$/u.test(token);
+      }
+
+      function isInitialToken(token) {
+        return /^\p{L}$/u.test(token);
+      }
+
+      function classifyName(name) {
+        if (name.tokens.length >= 2 && name.fullFirst && name.fullLast) return "anchor";
+        if (name.fullFirst && name.hasLastInitialOnly) return "alias";
+        if (name.hasFirstInitialOnly && name.fullLast) return "alias";
+        if (name.tokens.length === 1 && name.fullFirst) return "weakAlias";
+        return "standalone";
+      }
+
+      function sameAnchorPerson(a, b) {
+        if (a.first !== b.first) return false;
+        if (!a.last || !b.last) return false;
+        if (a.last[0] !== b.last[0]) return false;
+        if (a.middleInitial && b.middleInitial && a.middleInitial !== b.middleInitial) return false;
+        return safeLastNameTypo(a.last, b.last);
+      }
+
+      function safeLastNameTypo(a, b) {
+        if (a === b) return true;
+        if (a[0] !== b[0]) return false;
+        if (Math.min(a.length, b.length) < 5) return false;
+        const kind = oneEditKind(a, b);
+        return kind === "insert-delete" || kind === "transpose";
+      }
+
+      function oneEditKind(a, b) {
+        if (a === b) return "exact";
+        if (Math.abs(a.length - b.length) > 1) return false;
+        if (a.length === b.length) {
+          const diffs = [];
+          for (let index = 0; index < a.length; index += 1) {
+            if (a[index] !== b[index]) diffs.push(index);
+          }
+          if (diffs.length === 2) {
+            const [first, second] = diffs;
+            if (second === first + 1 && a[first] === b[second] && a[second] === b[first]) {
+              return "transpose";
+            }
+          }
+          return diffs.length === 1 ? "substitute" : null;
+        }
+
+        const longer = a.length > b.length ? a : b;
+        const shorter = a.length > b.length ? b : a;
+        let skipped = false;
+        let i = 0;
+        let j = 0;
+        while (i < longer.length && j < shorter.length) {
+          if (longer[i] === shorter[j]) {
+            i += 1;
+            j += 1;
+            continue;
+          }
+          if (skipped) return null;
+          skipped = true;
+          i += 1;
+        }
+        return "insert-delete";
+      }
+
+      function aliasMatchesAnchor(alias, anchor) {
+        if (alias.fullFirst && alias.hasLastInitialOnly) {
+          return alias.first === anchor.first && alias.last[0] === anchor.last[0];
+        }
+
+        if (alias.hasFirstInitialOnly && alias.fullLast) {
+          return alias.first[0] === anchor.first[0] && alias.last === anchor.last;
+        }
+
+        if (alias.tokens.length === 1 && alias.fullFirst) {
+          return alias.first === anchor.first;
+        }
+
+        return false;
+      }
+
+      function findUniqueAliasTarget(alias, clusters) {
+        const matches = clusters.filter((cluster) => aliasMatchesAnchor(alias, cluster.anchor));
+        return matches.length === 1 ? matches[0] : null;
+      }
+
+      function escapeHtml(value) {
+        return value
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
+      function collectMatches(text) {
+        const matches = [];
+        for (const detector of detectors) {
+          detector.pattern.lastIndex = 0;
+          let match;
+          while ((match = detector.pattern.exec(text)) !== null) {
+            const raw = detector.group ? match[detector.group] : match[0];
+            if (!raw) continue;
+            const groupOffset = detector.group ? match[0].indexOf(raw) : 0;
+            const start = match.index + groupOffset;
+            const end = start + raw.length;
+            if (detector.validate && !detector.validate(raw, text, start)) continue;
+            matches.push({
+              start,
+              end,
+              value: raw,
+              type: detector.type,
+              label: detector.label
+            });
+          }
+        }
+        return mergeMatches(matches);
+      }
+
+      function mergeMatches(matches) {
+        return matches
+          .sort((a, b) => a.start - b.start || (b.end - b.start) - (a.end - a.start))
+          .reduce((kept, candidate) => {
+            const last = kept[kept.length - 1];
+            if (!last || candidate.start >= last.end) {
+              kept.push(candidate);
+              return kept;
+            }
+            const candidateLength = candidate.end - candidate.start;
+            const lastLength = last.end - last.start;
+            if (candidate.start === last.start && candidateLength > lastLength) {
+              kept[kept.length - 1] = candidate;
+            }
+            return kept;
+          }, []);
+      }
+
+      function redact(text) {
+        const startTime = performance.now();
+        placeholderCounts.clear();
+        placeholderByValue.clear();
+        redactions.clear();
+        restoredIds.clear();
+
+        const matches = collectMatches(text);
+        const namePlaceholders = resolveNamePlaceholders(matches);
+        const parts = [];
+        let cursor = 0;
+        let plain = "";
+
+        matches.forEach((match, index) => {
+          const id = `r${index}`;
+          const placeholder = namePlaceholders.get(index) || nextPlaceholder(match.type, match.value);
+          redactions.set(id, { ...match, placeholder });
+          parts.push({ kind: "text", value: text.slice(cursor, match.start) });
+          parts.push({ kind: "redaction", id });
+          plain += text.slice(cursor, match.start) + placeholder;
+          cursor = match.end;
+        });
+
+        parts.push({ kind: "text", value: text.slice(cursor) });
+        plain += text.slice(cursor);
+
+        return {
+          parts,
+          plain,
+          count: matches.length,
+          elapsed: Math.max(0, performance.now() - startTime)
+        };
+      }
+
+      function renderResult(result) {
+        if (!rawSourceText) {
+          redactionBox.innerHTML = "";
+          redactedPlainText = "";
+          return;
+        }
+
+        let html = "";
+        redactedPlainText = "";
+
+        for (const part of result.parts) {
+          if (part.kind === "text") {
+            html += escapeHtml(part.value);
+            redactedPlainText += part.value;
+            continue;
+          }
+
+          const item = redactions.get(part.id);
+          const isRestored = restoredIds.has(part.id);
+          const visible = isRestored ? item.value : item.placeholder;
+          const label = isRestored ? "Original text restored. Click to redact." : `${item.label} redaction. Click to restore.`;
+          redactedPlainText += visible;
+          html += `<button class="redaction${isRestored ? " restored" : ""}" type="button" data-id="${part.id}" data-reveal="${escapeHtml(item.value)}" aria-label="${escapeHtml(label)}">${escapeHtml(visible)}</button>`;
+        }
+
+        redactionBox.innerHTML = html;
+      }
+
+      function showInputMode({ focus = true } = {}) {
+        editorInput.hidden = false;
+        redactionBox.hidden = true;
+        editorInput.value = rawSourceText;
+        if (focus) editorInput.focus();
+      }
+
+      function showRedactionMode() {
+        editorInput.hidden = true;
+        redactionBox.hidden = false;
+      }
+
+      function updateStatus(result) {
+        const charLabel = rawSourceText.length === 1 ? "character" : "characters";
+        if (!rawSourceText) {
+          statusText.innerHTML = `<strong>0</strong> characters, <strong>0</strong> redactions`;
+        } else {
+          statusText.innerHTML = `<strong>${rawSourceText.length.toLocaleString()}</strong> ${charLabel}, <strong>${result.count.toLocaleString()}</strong> redactions applied in <strong>${result.elapsed.toFixed(1)} ms</strong>`;
+        }
+        copyButton.disabled = !rawSourceText;
+      }
+
+      function loadAutoCopyPreference() {
+        try {
+          return localStorage.getItem(autoCopyStorageKey) !== "off";
+        } catch {
+          return true;
+        }
+      }
+
+      function saveAutoCopyPreference() {
+        try {
+          localStorage.setItem(autoCopyStorageKey, autoCopyToggle.checked ? "on" : "off");
+        } catch {
+          // Some file:// or private browsing contexts may block localStorage.
+        }
+      }
+
+      function autoCopyEnabled() {
+        return autoCopyToggle.checked;
+      }
+
+      function processRawText(text, { autoCopy = true, render = true } = {}) {
+        rawSourceText = text;
+        currentResult = redact(rawSourceText);
+        redactedPlainText = currentResult.plain;
+        if (render) {
+          window.clearTimeout(inputRenderTimer);
+          renderResult(currentResult);
+          showRedactionMode();
+        }
+        updateStatus(currentResult);
+        if (autoCopy && rawSourceText && autoCopyEnabled()) queueAutoCopy();
+        if (!rawSourceText) {
+          setCopyState("");
+          showInputMode({ focus: false });
+        }
+      }
+
+      function queueTypedRedaction() {
+        window.clearTimeout(inputRenderTimer);
+        if (!rawSourceText || !currentResult || currentResult.count === 0) return;
+        inputRenderTimer = window.setTimeout(() => {
+          if (editorInput.hidden) return;
+          processRawText(editorInput.value, { autoCopy: true, render: true });
+        }, 650);
+      }
+
+      function queueAutoCopy() {
+        window.clearTimeout(autoCopyTimer);
+        if (!autoCopyEnabled()) return;
+        autoCopyTimer = window.setTimeout(() => {
+          copyRedacted({ automatic: true });
+        }, 120);
+      }
+
+      async function copyRedacted({ automatic = false } = {}) {
+        if (automatic && !autoCopyEnabled()) return;
+
+        if (!editorInput.hidden) {
+          processRawText(editorInput.value, { autoCopy: false, render: true });
+        }
+
+        if (!redactedPlainText) {
+          setCopyState("Nothing to copy", true);
+          return;
+        }
+
+        try {
+          await navigator.clipboard.writeText(redactedPlainText);
+          setCopyState(automatic ? "Auto copied redacted text" : "Copied redacted text");
+        } catch {
+          if (automatic) {
+            setCopyState("Copy available", false);
+            return;
+          }
+          legacyCopy(redactedPlainText);
+        }
+      }
+
+      function legacyCopy(text) {
+        const hadEditorFocus = document.activeElement === editorInput;
+        const helper = document.createElement("textarea");
+        helper.value = text;
+        helper.setAttribute("readonly", "");
+        helper.className = "sr-only";
+        document.body.appendChild(helper);
+        helper.select();
+        try {
+          const copied = document.execCommand("copy");
+          setCopyState(copied ? "Copied redacted text" : "Use Copy button after allowing clipboard access", !copied);
+        } catch {
+          setCopyState("Use Copy button after allowing clipboard access", true);
+        } finally {
+          helper.remove();
+          if (hadEditorFocus) editorInput.focus();
+        }
+      }
+
+      function setCopyState(message, warning = false) {
+        window.clearTimeout(copyStateTimer);
+        copyState.textContent = message;
+        copyState.classList.toggle("warn", warning);
+        if (message && !warning) {
+          copyStateTimer = window.setTimeout(() => {
+            copyState.textContent = "";
+          }, 1600);
+        }
+      }
+
+      async function pasteFromClipboard() {
+        try {
+          processRawText(await navigator.clipboard.readText(), { autoCopy: true });
+          setCopyState("Pasted and redacted");
+        } catch {
+          showInputMode({ focus: true });
+          setCopyState("Paste into the box with keyboard", true);
+        }
+      }
+
+      editorInput.addEventListener("paste", (event) => {
+        event.preventDefault();
+        const text = event.clipboardData?.getData("text/plain") || "";
+        processRawText(text, { autoCopy: true });
+        setCopyState("Pasted and redacted");
+      });
+
+      editorInput.addEventListener("input", () => {
+        processRawText(editorInput.value, { autoCopy: false, render: false });
+        queueTypedRedaction();
+      });
+
+      redactionBox.addEventListener("click", (event) => {
+        const button = event.target.closest(".redaction");
+        if (!button) {
+          showInputMode({ focus: true });
+          return;
+        }
+        const id = button.dataset.id;
+        if (!redactions.has(id)) return;
+        if (restoredIds.has(id)) {
+          restoredIds.delete(id);
+        } else {
+          restoredIds.add(id);
+        }
+        renderResult(currentResult);
+        copyRedacted({ automatic: true });
+      });
+
+      copyButton.addEventListener("click", () => copyRedacted({ automatic: false }));
+      pasteButton.addEventListener("click", pasteFromClipboard);
+
+      clearButton.addEventListener("click", () => {
+        processRawText("", { autoCopy: false, render: false });
+        showInputMode({ focus: true });
+      });
+
+      autoCopyToggle.checked = loadAutoCopyPreference();
+      autoCopyToggle.addEventListener("change", () => {
+        window.clearTimeout(autoCopyTimer);
+        saveAutoCopyPreference();
+        setCopyState(autoCopyToggle.checked ? "Auto-copy on" : "Auto-copy off");
+      });
+
+      processRawText("", { autoCopy: false, render: false });
+      showInputMode({ focus: false });
+    })();
+  </script>
+</body>
+</html>
