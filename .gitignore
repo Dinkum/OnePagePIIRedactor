@@ -3,3 +3,10 @@ AGENTS.md
 STANDARDS.md
 ignore/
 architecture/
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+.env*
+!.env.example
