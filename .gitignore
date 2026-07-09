@@ -1,5 +1,21 @@
-.DS_Store
-AGENTS.md
-STANDARDS.md
-ignore/
-architecture/
+# Ignore everything by default. New public files must be explicitly opted in.
+*
+
+# Keep the allowlist itself tracked.
+!/.gitignore
+
+# Public app and docs.
+!/README.md
+!/index.html
+
+# Public assets that are intentionally shipped.
+!/assets/
+!/assets/demo-redaction.png
+!/assets/demo-index-network.png
+
+# Local-only/private areas are listed for clarity.
+/AGENTS.md
+/STANDARDS.md
+/architecture/
+/ignore/
+/.DS_Store
