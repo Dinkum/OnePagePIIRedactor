@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="app-version" content="0.1.1">
+  <meta name="app-version" content="0.1.2">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; font-src 'none'; base-uri 'none'; form-action 'none'">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23090b10'/%3E%3Cpath d='M14 20h36v8H14zm0 16h24v8H14z' fill='%23fb7185'/%3E%3Cpath d='M42 36h8v8h-8z' fill='%235eead4'/%3E%3C/svg%3E">
   <title>One Page PII Redactor</title>
@@ -48,6 +48,8 @@
     }
 
     button,
+    input,
+    select,
     textarea,
     .editor {
       font: inherit;
@@ -424,6 +426,469 @@
       text-underline-offset: 3px;
     }
 
+    .footer-links {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      flex: 0 0 auto;
+    }
+
+    .footer-experimental {
+      width: 28px;
+      min-height: 28px;
+      padding: 0;
+      border-color: transparent;
+      background: transparent;
+      color: var(--muted);
+    }
+
+    .footer-experimental:hover,
+    .footer-experimental:focus-visible {
+      border-color: var(--line-strong);
+      background: #151a23;
+      color: var(--ink);
+    }
+
+    .advanced-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      display: flex;
+      justify-content: flex-end;
+      background: rgba(2, 4, 8, 0.68);
+      backdrop-filter: blur(3px);
+    }
+
+    .advanced-backdrop[hidden],
+    .button[hidden],
+    .rules-empty[hidden],
+    .rules-table[hidden],
+    .rule-error[hidden],
+    .rules-status[hidden],
+    .rules-columns[hidden],
+    .discard-overlay[hidden] {
+      display: none;
+    }
+
+    .advanced-drawer {
+      width: min(620px, 100%);
+      height: 100%;
+      position: relative;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      border-left: 1px solid var(--line-strong);
+      background: #0d1118;
+      box-shadow: -24px 0 80px rgba(0, 0, 0, 0.46);
+      animation: drawerIn 160ms ease-out both;
+    }
+
+    .advanced-header {
+      min-height: 68px;
+      padding: 16px 18px 16px 24px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .advanced-header h2 {
+      margin: 0;
+      font-size: 18px;
+      line-height: 1.2;
+    }
+
+    .advanced-content {
+      min-height: 0;
+      padding: 24px;
+      overflow: auto;
+    }
+
+    .rules-section {
+      display: grid;
+      gap: 12px;
+    }
+
+    .rules-heading {
+      display: flex;
+      align-items: center;
+    }
+
+    .rules-heading h3 {
+      margin: 0;
+      font-size: 16px;
+      line-height: 1.3;
+    }
+
+    .rules-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 6px;
+    }
+
+    .rules-actions .button {
+      min-height: 34px;
+      padding: 6px 11px;
+      font-size: 12px;
+    }
+
+    .rules-actions .button.add-rule {
+      gap: 5px;
+    }
+
+    .rules-list {
+      display: grid;
+      gap: 0;
+    }
+
+    .rules-table {
+      display: grid;
+      overflow: visible;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #10151d;
+    }
+
+    .rules-status {
+      margin: -4px 0 0;
+      color: var(--ok);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .rules-status.warn {
+      color: var(--warn);
+    }
+
+    .rules-empty {
+      min-height: 156px;
+      border: 1px dashed var(--line-strong);
+      border-radius: var(--radius);
+      color: var(--muted);
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      text-align: center;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .rules-columns,
+    .rule-row {
+      display: grid;
+      grid-template-columns: 32px minmax(132px, 0.8fr) 110px minmax(180px, 1.25fr) 34px;
+      column-gap: 6px;
+    }
+
+    .rules-columns {
+      position: relative;
+      min-height: 20px;
+      align-items: center;
+      padding: 0 7px;
+      overflow: hidden;
+      background: rgba(12, 17, 24, 0.56);
+      color: #909baa;
+      font-size: 10px;
+      font-weight: 650;
+      letter-spacing: 0.04em;
+      line-height: 1.2;
+      text-transform: uppercase;
+    }
+
+    .rules-columns span {
+      min-width: 0;
+      height: 100%;
+      display: grid;
+      place-items: center;
+      text-align: center;
+    }
+
+    .rules-columns span:nth-child(3) {
+      border-left: 1px solid var(--line);
+    }
+
+    .rules-columns span:nth-child(2),
+    .rules-columns span:nth-child(3) {
+      place-items: center start;
+      padding-left: 10px;
+      text-align: left;
+    }
+
+    .rules-columns span:nth-child(1) {
+      grid-column: 1;
+    }
+
+    .rules-columns span:nth-child(2) {
+      grid-column: 2;
+    }
+
+    .rules-columns span:nth-child(3) {
+      grid-column: 3;
+    }
+
+    .rules-columns span:nth-child(4) {
+      grid-column: 5;
+    }
+
+    .rule-row {
+      overflow: hidden;
+      align-items: center;
+      padding: 7px;
+      border: 0;
+      border-top: 1px solid var(--line);
+      border-radius: 0;
+      background: #10151d;
+      transition: border-color 120ms ease, background 120ms ease, opacity 120ms ease;
+    }
+
+    .rule-row.dragging {
+      border-color: var(--accent-line);
+      background: var(--panel-strong);
+      opacity: 0.78;
+    }
+
+    .rule-row:has(.rule-select-menu:not([hidden])) {
+      position: relative;
+      z-index: 3;
+      overflow: visible;
+    }
+
+    .rule-cell {
+      min-width: 0;
+      min-height: 36px;
+      padding: 0;
+      display: grid;
+      align-items: center;
+    }
+
+    .rule-drag {
+      width: 32px;
+      min-height: 36px;
+      padding: 0;
+      border-color: transparent;
+      background: transparent;
+      color: #788497;
+      cursor: grab;
+      touch-action: none;
+    }
+
+    .rule-drag:hover {
+      color: var(--ink);
+    }
+
+    .rule-drag:active {
+      cursor: grabbing;
+    }
+
+    .rule-input {
+      width: 100%;
+      height: 36px;
+      min-width: 0;
+      border: 1px solid var(--line-strong);
+      border-radius: 6px;
+      outline: 0;
+      background: #0b1017;
+      color: var(--ink);
+      padding: 0 10px;
+      font-size: 13px;
+      line-height: 1.2;
+    }
+
+    .rule-input::placeholder {
+      color: #6f7a89;
+      opacity: 1;
+    }
+
+    .rule-input[data-role="match"] {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    }
+
+    .rule-input:focus {
+      border-color: var(--accent-line);
+      box-shadow: 0 0 0 2px rgba(251, 113, 133, 0.13);
+    }
+
+    .rule-input[aria-invalid="true"] {
+      border-color: var(--warn);
+    }
+
+    .rule-select-wrap {
+      position: relative;
+      height: 36px;
+      min-width: 0;
+    }
+
+    .rule-select {
+      width: 100%;
+      height: 36px;
+      min-width: 0;
+      border: 1px solid var(--line-strong);
+      border-radius: 6px;
+      outline: 0;
+      background: #0b1017;
+      color: var(--ink);
+      padding: 0 28px 0 10px;
+      cursor: pointer;
+      text-align: left;
+      font-size: 13px;
+      line-height: 1.2;
+    }
+
+    .rule-select-wrap::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      right: 11px;
+      width: 6px;
+      height: 6px;
+      border-right: 1.5px solid var(--muted);
+      border-bottom: 1.5px solid var(--muted);
+      pointer-events: none;
+      transform: translateY(-70%) rotate(45deg);
+      transition: transform 120ms ease;
+    }
+
+    .rule-select:focus {
+      border-color: var(--accent-line);
+      box-shadow: 0 0 0 2px rgba(251, 113, 133, 0.13);
+    }
+
+    .rule-select-wrap:has(.rule-select[aria-expanded="true"])::after {
+      transform: translateY(-30%) rotate(225deg);
+    }
+
+    .rule-select-menu[hidden] {
+      display: none;
+    }
+
+    .rule-select-menu {
+      position: absolute;
+      top: calc(100% + 6px);
+      right: -8px;
+      z-index: 5;
+      min-width: 108px;
+      padding: 4px;
+      border: 1px solid var(--line-strong);
+      border-radius: 7px;
+      background: #151b24;
+      box-shadow: 0 14px 34px rgba(0, 0, 0, 0.48);
+    }
+
+    .rule-select-option {
+      width: 100%;
+      min-height: 32px;
+      padding: 6px 9px;
+      border: 0;
+      border-radius: 4px;
+      outline: 0;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      text-align: left;
+      font-size: 12px;
+      line-height: 1.2;
+    }
+
+    .rule-select-option:hover,
+    .rule-select-option:focus-visible {
+      background: #252d39;
+      color: var(--ink);
+    }
+
+    .rule-select-option[aria-selected="true"] {
+      background: var(--accent-soft);
+      color: var(--ink);
+    }
+
+    .rule-delete {
+      width: 34px;
+      min-height: 36px;
+      padding: 0;
+      border-color: transparent;
+      background: transparent;
+      color: var(--muted);
+    }
+
+    .rule-error {
+      grid-column: 2 / 5;
+      margin: 0;
+      padding: 4px 0 0;
+      color: var(--warn);
+      font-size: 11px;
+      line-height: 1.35;
+    }
+
+    .advanced-footer {
+      min-height: 66px;
+      padding: 14px 18px;
+      border-top: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      background: rgba(13, 17, 24, 0.96);
+    }
+
+    .advanced-footer .button.primary[disabled] {
+      border-color: var(--line-strong);
+      background: #151a23;
+      color: #6f7a8a;
+    }
+
+    .discard-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background: rgba(5, 8, 13, 0.76);
+      backdrop-filter: blur(3px);
+    }
+
+    .discard-card {
+      width: min(360px, 100%);
+      padding: 20px;
+      border: 1px solid var(--line-strong);
+      border-radius: 10px;
+      background: var(--panel-strong);
+      box-shadow: var(--shadow);
+    }
+
+    .discard-card h3 {
+      margin: 0;
+      font-size: 16px;
+    }
+
+    .discard-card p {
+      margin: 8px 0 18px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .discard-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    body.advanced-open {
+      overflow: hidden;
+    }
+
+    @keyframes drawerIn {
+      from {
+        opacity: 0;
+        transform: translateX(18px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
     @keyframes copyFlash {
       0% {
         opacity: 0;
@@ -473,6 +938,157 @@
 
       .status-line {
         width: 100%;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 7px 12px;
+      }
+
+      .statusbar {
+        padding: 10px 14px;
+      }
+    }
+
+    @media (max-width: 700px) {
+      .advanced-drawer {
+        width: 100%;
+        border-left: 0;
+      }
+
+      .advanced-header {
+        padding: 14px 16px;
+      }
+
+      .advanced-content {
+        padding: 20px 14px 24px;
+      }
+
+      .rules-heading {
+        align-items: flex-start;
+      }
+
+      .rules-actions {
+        flex-wrap: wrap;
+      }
+
+      .rules-columns,
+      .rule-row {
+        grid-template-columns: 30px minmax(0, 1fr) 88px 30px;
+      }
+
+      .rules-columns {
+        grid-template-rows: 24px;
+      }
+
+      .rules-columns::before,
+      .rules-columns::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        z-index: 1;
+        width: 1px;
+        background: var(--line);
+        pointer-events: none;
+      }
+
+      .rules-columns::before {
+        left: 44px;
+      }
+
+      .rules-columns::after {
+        right: 44px;
+      }
+
+      .rule-row {
+        row-gap: 6px;
+      }
+
+      .rules-columns span:nth-child(1) {
+        grid-column: 1;
+        grid-row: 1;
+      }
+
+      .rules-columns span:nth-child(2) {
+        grid-column: 2;
+        grid-row: 1;
+      }
+
+      .rules-columns span:nth-child(3) {
+        grid-column: 3;
+        grid-row: 1;
+      }
+
+      .rules-columns span:nth-child(4) {
+        grid-column: 4;
+        grid-row: 1;
+      }
+
+      .rule-drag {
+        grid-column: 1;
+        grid-row: 1;
+      }
+
+      .rule-cell-label {
+        grid-column: 2;
+        grid-row: 1;
+      }
+
+      .rule-cell-type {
+        grid-column: 3;
+        grid-row: 1;
+      }
+
+      .rule-cell-match {
+        grid-column: 2 / 4;
+        grid-row: 2;
+        min-height: 36px;
+      }
+
+      .rule-delete {
+        grid-column: 4;
+        grid-row: 1;
+      }
+
+      .rule-error {
+        grid-column: 2 / 4;
+        grid-row: 3;
+      }
+
+      .rule-select-wrap::after {
+        right: 7px;
+      }
+
+      .rule-drag,
+      .rule-delete {
+        width: 30px;
+        min-height: 36px;
+      }
+
+      .rule-cell-label,
+      .rule-cell-type {
+        min-height: 36px;
+      }
+
+      .advanced-footer {
+        min-height: 60px;
+        padding: 10px 14px;
+      }
+    }
+
+    @media (max-width: 360px) {
+      .advanced-content {
+        padding-inline: 10px;
+      }
+
+      .rule-input {
+        padding-inline: 6px;
+        font-size: 12px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .advanced-drawer {
+        animation: none;
       }
     }
   </style>
@@ -528,16 +1144,80 @@
       <div class="status-inner">
         <div class="status-line">
           <div class="status" id="statusText" role="status" aria-live="polite" aria-atomic="true"><strong>0</strong> characters, <strong>0</strong> redactions</div>
-          <a class="source-link" href="https://github.com/Dinkum/OnePagePIIRedactor" rel="noopener" aria-label="Source on GitHub">
-            <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-              <path d="M8 0C3.58 0 0 3.67 0 8.2c0 3.63 2.29 6.7 5.47 7.79.4.08.55-.18.55-.39v-1.39c-2.23.5-2.7-1.1-2.7-1.1-.36-.95-.89-1.2-.89-1.2-.73-.51.06-.5.06-.5.8.06 1.22.85 1.22.85.72 1.26 1.88.9 2.34.69.07-.53.28-.9.5-1.1-1.78-.21-3.65-.91-3.65-4.05 0-.9.31-1.63.82-2.2-.08-.21-.36-1.05.08-2.18 0 0 .67-.22 2.2.84A7.4 7.4 0 0 1 8 3.99c.68 0 1.36.09 2 .27 1.53-1.06 2.2-.84 2.2-.84.44 1.13.16 1.97.08 2.18.51.57.82 1.3.82 2.2 0 3.15-1.87 3.84-3.66 4.05.29.26.55.76.55 1.53v2.22c0 .21.15.47.55.39A8.13 8.13 0 0 0 16 8.2C16 3.67 12.42 0 8 0Z"></path>
-            </svg>
-            <span>Source</span>
-          </a>
+          <div class="footer-links">
+            <a class="source-link" href="https://github.com/Dinkum/OnePagePIIRedactor" rel="noopener" aria-label="Source on GitHub">
+              <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                <path d="M8 0C3.58 0 0 3.67 0 8.2c0 3.63 2.29 6.7 5.47 7.79.4.08.55-.18.55-.39v-1.39c-2.23.5-2.7-1.1-2.7-1.1-.36-.95-.89-1.2-.89-1.2-.73-.51.06-.5.06-.5.8.06 1.22.85 1.22.85.72 1.26 1.88.9 2.34.69.07-.53.28-.9.5-1.1-1.78-.21-3.65-.91-3.65-4.05 0-.9.31-1.63.82-2.2-.08-.21-.36-1.05.08-2.18 0 0 .67-.22 2.2.84A7.4 7.4 0 0 1 8 3.99c.68 0 1.36.09 2 .27 1.53-1.06 2.2-.84 2.2-.84.44 1.13.16 1.97.08 2.18.51.57.82 1.3.82 2.2 0 3.15-1.87 3.84-3.66 4.05.29.26.55.76.55 1.53v2.22c0 .21.15.47.55.39A8.13 8.13 0 0 0 16 8.2C16 3.67 12.42 0 8 0Z"></path>
+              </svg>
+              <span>Source</span>
+            </a>
+            <button class="button icon footer-experimental" id="advancedButton" type="button" title="Advanced features" aria-label="Advanced features" aria-haspopup="dialog" aria-controls="advancedDrawer" aria-expanded="false">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M9 3h6"></path>
+                <path d="M10 3v6.4L5.6 17a2.7 2.7 0 0 0 2.3 4h8.2a2.7 2.7 0 0 0 2.3-4L14 9.4V3"></path>
+                <path d="M7.8 15h8.4"></path>
+              </svg>
+            </button>
+          </div>
         </div>
         <div class="copy-state" id="copyState" role="status" aria-live="polite" aria-atomic="true"></div>
       </div>
     </footer>
+  </div>
+
+  <div class="advanced-backdrop" id="advancedBackdrop" hidden>
+    <section class="advanced-drawer" id="advancedDrawer" role="dialog" aria-modal="true" aria-labelledby="advancedTitle" tabindex="-1">
+      <header class="advanced-header">
+        <h2 id="advancedTitle">Advanced Features</h2>
+        <button class="button icon" id="advancedCloseButton" type="button" title="Close advanced features" aria-label="Close advanced features">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+            <path d="M6 6l12 12M18 6 6 18"></path>
+          </svg>
+        </button>
+      </header>
+      <div class="advanced-content">
+        <section class="rules-section" aria-labelledby="customRulesTitle">
+          <div class="rules-heading">
+            <h3 id="customRulesTitle">Custom Rules</h3>
+          </div>
+          <div class="rules-actions">
+            <input id="rulesImportInput" type="file" accept="application/json,.json" hidden>
+            <button class="button" id="rulesImportButton" type="button">Import JSON</button>
+            <button class="button" id="rulesExportButton" type="button" hidden>Export JSON</button>
+            <button class="button add-rule" id="ruleAddButton" type="button" title="Add custom rule" aria-label="Add custom rule">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+                <path d="M12 5v14M5 12h14"></path>
+              </svg>
+              <span>Add rule</span>
+            </button>
+          </div>
+          <div class="rules-status" id="rulesStatus" role="status" aria-live="polite" aria-atomic="true" hidden></div>
+          <div class="rules-empty" id="rulesEmpty">No custom rules. Add one or import a JSON rule set.</div>
+          <div class="rules-table" id="rulesTable" hidden>
+            <div class="rules-columns" id="rulesColumns" aria-hidden="true">
+              <span></span>
+              <span>Label</span>
+              <span>Type</span>
+              <span></span>
+            </div>
+            <div class="rules-list" id="rulesList"></div>
+          </div>
+        </section>
+      </div>
+      <footer class="advanced-footer">
+        <button class="button primary" id="rulesSaveButton" type="button" disabled>Save &amp; apply</button>
+      </footer>
+      <div class="discard-overlay" id="discardOverlay" hidden>
+        <section class="discard-card" role="alertdialog" aria-modal="true" aria-labelledby="discardTitle" aria-describedby="discardDescription">
+          <h3 id="discardTitle">Discard changes?</h3>
+          <p id="discardDescription">Your unsaved custom rule changes will be lost.</p>
+          <div class="discard-actions">
+            <button class="button" id="keepEditingButton" type="button">Keep editing</button>
+            <button class="button primary" id="discardChangesButton" type="button">Discard</button>
+          </div>
+        </section>
+      </div>
+    </section>
   </div>
 
   <script>
@@ -552,6 +1232,22 @@
       const pasteButton = document.getElementById("pasteButton");
       const clearButton = document.getElementById("clearButton");
       const autoCopyToggle = document.getElementById("autoCopyToggle");
+      const advancedButton = document.getElementById("advancedButton");
+      const advancedBackdrop = document.getElementById("advancedBackdrop");
+      const advancedDrawer = document.getElementById("advancedDrawer");
+      const advancedCloseButton = document.getElementById("advancedCloseButton");
+      const rulesImportInput = document.getElementById("rulesImportInput");
+      const rulesImportButton = document.getElementById("rulesImportButton");
+      const rulesExportButton = document.getElementById("rulesExportButton");
+      const ruleAddButton = document.getElementById("ruleAddButton");
+      const rulesStatus = document.getElementById("rulesStatus");
+      const rulesEmpty = document.getElementById("rulesEmpty");
+      const rulesTable = document.getElementById("rulesTable");
+      const rulesList = document.getElementById("rulesList");
+      const rulesSaveButton = document.getElementById("rulesSaveButton");
+      const discardOverlay = document.getElementById("discardOverlay");
+      const keepEditingButton = document.getElementById("keepEditingButton");
+      const discardChangesButton = document.getElementById("discardChangesButton");
 
       const redactions = new Map();
       const restoredIds = new Set();
@@ -561,10 +1257,29 @@
       let autoCopyTimer = 0;
       let copyStateTimer = 0;
       let inputRenderTimer = 0;
+      let rulesStatusTimer = 0;
+      let customRuleSequence = 0;
+      let customRules = [];
+      let customRuleDrafts = [];
+      let compiledCustomRules = [];
+      let showCustomRuleErrors = false;
+      let ruleDragState = null;
       const autoCopyStorageKey = "one-page-pii-redactor:auto-copy";
+      const customRulesStorageKey = "one-page-pii-redactor:custom-rules";
       const maxRedactionCharacters = 200000;
+      const maxCustomRules = 50;
+      const maxCustomLabelLength = 40;
+      const maxCustomMatchLength = 300;
+      const maxCustomMatches = 5000;
+      const customRulePriority = 500;
 
       const detectors = [
+        {
+          type: "PROTECTED_WINDOWS_SID",
+          pattern: /(?<![\p{L}\p{N}_-])S-\d+-\d+(?:-\d+){0,15}(?![\p{L}\p{N}_-])/giu,
+          protect: true,
+          priority: 1000
+        },
         {
           type: "EMAIL",
           label: "email address",
@@ -573,7 +1288,13 @@
         {
           type: "SSN",
           label: "SSN",
-          pattern: /\b\d{3}[- ]?\d{2}[- ]?\d{4}\b/g
+          pattern: /(?<![\p{L}\p{N}_-])\d{3}-\d{2}-\d{4}(?![\p{L}\p{N}_-])/gu
+        },
+        {
+          type: "SSN",
+          label: "SSN",
+          pattern: /\b(?:SSN|social[ \t]+security(?:[ \t]+number)?)\b["']?[ \t]*(?:is|[:=#-])?[ \t]*["']?(\d{3}(?:[- ]?\d{2})[- ]?\d{4})\b/gi,
+          group: 1
         },
         {
           type: "CREDIT_CARD",
@@ -592,7 +1313,7 @@
           type: "PHONE",
           label: "phone number",
           pattern: /(?<!\w)(?:\+?1[\s.-]?)?(?:\(\d{3}\)|\d{3})[\s.-]?\d{3}[\s.-]?\d{4}(?:\s*(?:x|ext\.?|extension)\s*\d{1,6})?(?!\w)/gi,
-          validate: (value) => value.replace(/\D/g, "").length >= 10
+          validate: isCompletePhoneValue
         },
         {
           type: "IP_ADDRESS",
@@ -614,14 +1335,8 @@
         {
           type: "DATE_OF_BIRTH",
           label: "date of birth",
-          pattern: /\b(?:DOB|D\.O\.B\.|date of birth|birth date|born)["']?[ \t]*(?:is|[:=#-])?[ \t]*["']?(\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}[/-]\d{1,2}[/-]\d{1,2}|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.?[ \t]+\d{1,2},?[ \t]+\d{4})\b/gi,
+          pattern: /\b(?:DOB(?:[ \t]*\/[ \t]*DOB)?|D\.O\.B\.|date[_ \t-]*of[_ \t-]*birth|birth[_ \t-]*date|born)["']?[ \t]*(?:is|says[ \t]+birth[_ \t-]*date|[:=#,-])?[ \t]*["']?(\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}[/-]\d{1,2}[/-]\d{1,2}|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.?[ \t]+\d{1,2},?[ \t]+\d{4})\b/gi,
           group: 1
-        },
-        {
-          type: "DATE_OF_BIRTH",
-          label: "date of birth",
-          pattern: /\b(?:\d{1,2}[/-]\d{1,2}[/-](?:19|20)\d{2}|(?:19|20)\d{2}[/-]\d{1,2}[/-]\d{1,2})\b/g,
-          validate: (_value, text, start) => !/\brelease date\s*$/i.test(text.slice(Math.max(0, start - 24), start))
         },
         {
           type: "ADDRESS",
@@ -662,14 +1377,16 @@
           label: "account number",
           pattern: /\b(?:account|acct|acct_id|customer_id|customer id|vendor[ \t]*id|member(?:[ \t]*id)?|employee[ \t]*id|badge[ \t]+member[ \t]*id|routing(?:[ \t]+account[ \t]+ref)?|iban|mrn|patient[ \t]*(?:id|no|number)?|patient_no|policy|checking[ \t]+account|target_account)\s*(?:number|no\.?|ref|#|id)?\s*(?:[:=#-])?[ \t]*["']?([A-Z0-9][A-Z0-9_-]{3,})\b/gi,
           group: 1,
-          validate: (value) => /\d/.test(value) && value.replace(/[^A-Z0-9]/gi, "").length >= 5
+          validate: (value) => /\d/.test(value) && value.replace(/[^A-Z0-9]/gi, "").length >= 5,
+          propagate: true
         },
         {
           type: "ACCOUNT",
           label: "account number",
-          pattern: /["']?(?:patient_no|patient_id|member_id|account_id|target_account)["']?[ \t,:=]+["']([A-Z0-9][A-Z0-9_-]{3,})["']/gi,
+          pattern: /["']?(?:patient_no|patient_id|member_id|account_id|target_account)["']?[ \t,:=]+["']?([A-Z0-9][A-Z0-9_-]{3,})\b/gi,
           group: 1,
-          validate: (value) => /\d/.test(value) && value.replace(/[^A-Z0-9]/gi, "").length >= 5
+          validate: (value) => /\d/.test(value) && value.replace(/[^A-Z0-9]/gi, "").length >= 5,
+          propagate: true
         },
         {
           type: "ACCOUNT",
@@ -681,7 +1398,8 @@
           type: "USERNAME",
           label: "username",
           pattern: /\b(?:username|user id|login)\s*[:#-]?\s*([A-Z0-9._-]{3,})\b/gi,
-          group: 1
+          group: 1,
+          propagate: true
         },
         {
           type: "NAME",
@@ -837,6 +1555,412 @@
         "workflow"
       ]);
 
+      function createCustomRule(rule = {}) {
+        customRuleSequence += 1;
+        return {
+          id: `custom-${customRuleSequence}`,
+          label: typeof rule.label === "string" ? rule.label : "",
+          autoLabel: rule.autoLabel === true,
+          matchType: rule.matchType === "regex" ? "regex" : "text",
+          match: typeof rule.match === "string" ? rule.match : ""
+        };
+      }
+
+      function cloneCustomRules(rules) {
+        return rules.map((rule) => {
+          const clone = createCustomRule(rule);
+          if (/^custom-\d+$/.test(rule.id)) clone.id = rule.id;
+          return clone;
+        });
+      }
+
+      function portableCustomRule(rule) {
+        return {
+          label: rule.label.trim(),
+          matchType: rule.matchType,
+          match: rule.match
+        };
+      }
+
+      function customRuleError(rule) {
+        const label = rule.label.trim();
+        if (!label) return "Enter a label.";
+        if (label.length > maxCustomLabelLength) return `Labels can be up to ${maxCustomLabelLength} characters.`;
+        if (rule.matchType !== "text" && rule.matchType !== "regex") return "Choose a supported match type.";
+        if (!rule.match) return rule.matchType === "regex" ? "Enter a regular expression." : "Enter text to match.";
+        if (rule.matchType === "text" && rule.match.length < 2) return "Plain-text matches need at least 2 characters.";
+        if (rule.match.length > maxCustomMatchLength) return `Matches can be up to ${maxCustomMatchLength} characters.`;
+        if (rule.matchType === "regex") {
+          let pattern;
+          try {
+            pattern = new RegExp(rule.match, "gu");
+          } catch {
+            return "Enter a valid JavaScript regular expression.";
+          }
+          if (pattern.test("")) return "The expression must not match empty text.";
+          const safetyError = customRegexSafetyError(rule.match);
+          if (safetyError) return safetyError;
+        }
+        return "";
+      }
+
+      function customRegexSafetyError(source) {
+        const simplified = source
+          .replace(/\\./g, "x")
+          .replace(/\[(?:\\.|[^\]\\])*\]/g, "x");
+        if (/\((?:[^()]|\([^()]*\))*[+*{][^()]*\)[+*{]/.test(simplified)) {
+          return "Nested repetition is not allowed because it can stall matching.";
+        }
+        if (/\([^)]*\|[^)]*\)[+*{]/.test(simplified)) {
+          return "Repeated alternatives are not allowed because they can stall matching.";
+        }
+        if (/(?:\.\*|\.\+).*(?:\.\*|\.\+)/.test(simplified)) {
+          return "Multiple unbounded wildcards are not allowed.";
+        }
+        if (/\\[1-9]/.test(source)) {
+          return "Backreferences are not supported in custom rules.";
+        }
+        return "";
+      }
+
+      function parseCustomRuleSet(json) {
+        let payload;
+        try {
+          payload = JSON.parse(json);
+        } catch {
+          throw new Error("That file is not valid JSON.");
+        }
+        if (!payload || payload.version !== 1 || !Array.isArray(payload.rules)) {
+          throw new Error("That file is not a supported custom rule set.");
+        }
+        if (payload.rules.length > maxCustomRules) {
+          throw new Error(`A rule set can contain up to ${maxCustomRules} rules.`);
+        }
+
+        return payload.rules.map((rule, index) => {
+          if (!rule || typeof rule !== "object" || Array.isArray(rule)) {
+            throw new Error(`Rule ${index + 1} is not valid.`);
+          }
+          const normalized = createCustomRule(rule);
+          const error = customRuleError(normalized);
+          if (error) throw new Error(`Rule ${index + 1}: ${error}`);
+          return normalized;
+        });
+      }
+
+      function loadCustomRules() {
+        try {
+          const saved = localStorage.getItem(customRulesStorageKey);
+          if (!saved) return [];
+          const payload = JSON.parse(saved);
+          if (!payload || payload.version !== 1 || !Array.isArray(payload.rules)) return [];
+          return payload.rules.slice(0, maxCustomRules).flatMap((rule) => {
+            if (!rule || typeof rule !== "object" || Array.isArray(rule)) return [];
+            const normalized = createCustomRule({
+              label: typeof rule.label === "string" ? rule.label.slice(0, maxCustomLabelLength) : "",
+              matchType: rule.matchType,
+              match: typeof rule.match === "string" ? rule.match.slice(0, maxCustomMatchLength) : ""
+            });
+            return customRuleError(normalized) ? [] : [normalized];
+          });
+        } catch {
+          return [];
+        }
+      }
+
+      function saveCustomRules() {
+        try {
+          localStorage.setItem(customRulesStorageKey, JSON.stringify({
+            version: 1,
+            rules: customRules.map(portableCustomRule)
+          }));
+        } catch {
+          // Some file:// or private browsing contexts may block localStorage.
+        }
+      }
+
+      function rebuildCompiledCustomRules() {
+        compiledCustomRules = customRules.map((rule, ruleIndex) => ({
+          rule,
+          ruleIndex,
+          pattern: rule.matchType === "regex" ? new RegExp(rule.match, "gu") : null
+        }));
+      }
+
+      function customRulesSignature(rules) {
+        return JSON.stringify(rules.map(portableCustomRule));
+      }
+
+      function customRulesHaveUnsavedChanges() {
+        return customRulesSignature(customRuleDrafts) !== customRulesSignature(customRules);
+      }
+
+      function updateCustomRulesDirtyState() {
+        rulesSaveButton.disabled = !customRulesHaveUnsavedChanges();
+      }
+
+      function renderCustomRules({ focusId = null } = {}) {
+        rulesEmpty.hidden = customRuleDrafts.length > 0;
+        rulesTable.hidden = customRuleDrafts.length === 0;
+        rulesExportButton.hidden = customRules.length === 0;
+        rulesList.innerHTML = customRuleDrafts.map((rule, index) => {
+          const error = showCustomRuleErrors ? customRuleError(rule) : "";
+          const errorId = `${rule.id}-error`;
+          const matchPlaceholder = rule.matchType === "regex" ? "Regex to match" : "Text to match";
+          const labelId = `${rule.id}-label`;
+          const typeId = `${rule.id}-type`;
+          const matchId = `${rule.id}-match`;
+          return `
+            <div class="rule-row" data-rule-id="${rule.id}">
+              <button class="button rule-drag" type="button" data-action="drag" title="Drag to reorder" aria-label="Drag ${escapeHtml(rule.label || `rule ${index + 1}`)} to reorder">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                  <path d="M5 7h14M5 12h14M5 17h14"></path>
+                </svg>
+              </button>
+              <label class="rule-cell rule-cell-label" for="${labelId}">
+                  <input class="rule-input" id="${labelId}" data-role="label" type="text" maxlength="${maxCustomLabelLength}" value="${escapeHtml(rule.label)}" placeholder="Internal ID" aria-label="Label for rule ${index + 1}" aria-invalid="${error && !rule.label.trim() ? "true" : "false"}" aria-describedby="${errorId}">
+              </label>
+              <div class="rule-cell rule-cell-type">
+                  <span class="rule-select-wrap">
+                    <button class="rule-select" id="${typeId}" type="button" data-action="toggle-type" aria-label="Type for rule ${index + 1}" aria-haspopup="listbox" aria-expanded="false" aria-controls="${typeId}-menu">
+                      <span class="rule-select-value">${rule.matchType === "regex" ? "Regex" : "Text"}</span>
+                    </button>
+                    <span class="rule-select-menu" id="${typeId}-menu" role="listbox" aria-label="Type for rule ${index + 1}" hidden>
+                      <button class="rule-select-option" type="button" role="option" data-action="choose-type" data-match-type="text" aria-selected="${rule.matchType === "text" ? "true" : "false"}">Text</button>
+                      <button class="rule-select-option" type="button" role="option" data-action="choose-type" data-match-type="regex" aria-selected="${rule.matchType === "regex" ? "true" : "false"}">Regex</button>
+                    </span>
+                  </span>
+              </div>
+              <label class="rule-cell rule-cell-match" for="${matchId}">
+                  <input class="rule-input" id="${matchId}" data-role="match" type="text" maxlength="${maxCustomMatchLength}" value="${escapeHtml(rule.match)}" placeholder="${escapeHtml(matchPlaceholder)}" spellcheck="false" autocapitalize="off" aria-label="Match for rule ${index + 1}" aria-invalid="${error && rule.label.trim() ? "true" : "false"}" aria-describedby="${errorId}">
+              </label>
+              <button class="button rule-delete" type="button" data-action="delete" title="Delete rule" aria-label="Delete ${escapeHtml(rule.label || "rule")}">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13"></path>
+                </svg>
+              </button>
+              <p class="rule-error" id="${errorId}" role="status"${error ? "" : " hidden"}>${escapeHtml(error)}</p>
+            </div>
+          `;
+        }).join("");
+
+        updateCustomRulesDirtyState();
+
+        if (focusId) {
+          rulesList.querySelector?.(`[data-rule-id="${focusId}"] [data-role="label"]`)?.focus();
+        }
+      }
+
+      function setRulesStatus(message, warning = false) {
+        window.clearTimeout(rulesStatusTimer);
+        rulesStatus.textContent = message;
+        rulesStatus.hidden = !message;
+        rulesStatus.classList.toggle("warn", warning);
+        if (message && !warning) {
+          rulesStatusTimer = window.setTimeout(() => {
+            rulesStatus.textContent = "";
+            rulesStatus.hidden = true;
+          }, 2600);
+        }
+      }
+
+      function closeRuleTypeMenus(except = null) {
+        rulesList.querySelectorAll(".rule-select-menu:not([hidden])").forEach((menu) => {
+          if (menu === except) return;
+          menu.hidden = true;
+          menu.closest(".rule-select-wrap")?.querySelector('[data-action="toggle-type"]')?.setAttribute("aria-expanded", "false");
+        });
+      }
+
+      function openRuleTypeMenu(ruleRow, { focusOption = false } = {}) {
+        const menu = ruleRow?.querySelector(".rule-select-menu");
+        const toggle = ruleRow?.querySelector('[data-action="toggle-type"]');
+        if (!menu || !toggle) return;
+        closeRuleTypeMenus(menu);
+        menu.hidden = false;
+        toggle.setAttribute("aria-expanded", "true");
+        if (focusOption) menu.querySelector('[aria-selected="true"]')?.focus();
+      }
+
+      function chooseRuleType(ruleRow, rule, matchType) {
+        rule.matchType = matchType === "regex" ? "regex" : "text";
+        ruleRow.querySelector(".rule-select-value").textContent = rule.matchType === "regex" ? "Regex" : "Text";
+        ruleRow.querySelectorAll(".rule-select-option").forEach((option) => {
+          option.setAttribute("aria-selected", option.dataset.matchType === rule.matchType ? "true" : "false");
+        });
+        const matchInput = ruleRow.querySelector('[data-role="match"]');
+        if (matchInput) matchInput.placeholder = rule.matchType === "regex" ? "Regex to match" : "Text to match";
+        refreshRuleRow(ruleRow, rule);
+        noteCustomRuleDraftChange();
+      }
+
+      function refreshRuleRow(ruleRow, rule) {
+        const error = showCustomRuleErrors ? customRuleError(rule) : "";
+        const labelInput = ruleRow.querySelector?.('[data-role="label"]');
+        const matchInput = ruleRow.querySelector?.('[data-role="match"]');
+        const errorNode = ruleRow.querySelector?.(".rule-error");
+        labelInput?.setAttribute("aria-invalid", error && !rule.label.trim() ? "true" : "false");
+        matchInput?.setAttribute("aria-invalid", error && rule.label.trim() ? "true" : "false");
+        if (errorNode) {
+          errorNode.textContent = error;
+          errorNode.hidden = !error;
+        }
+      }
+
+      function applyCustomRulesToCurrentText() {
+        if (!rawSourceText) return;
+        processRawText(rawSourceText, { autoCopy: false, render: true });
+      }
+
+      function commitCustomRuleDrafts() {
+        const invalidIndex = customRuleDrafts.findIndex((rule) => customRuleError(rule));
+        if (invalidIndex !== -1) {
+          showCustomRuleErrors = true;
+          renderCustomRules();
+          setRulesStatus(`Fix rule ${invalidIndex + 1} before saving.`, true);
+          const invalidRule = customRuleDrafts[invalidIndex];
+          rulesList.querySelector?.(`[data-rule-id="${invalidRule.id}"] [aria-invalid="true"]`)?.focus();
+          return;
+        }
+
+        customRuleDrafts.forEach((rule) => {
+          rule.autoLabel = false;
+        });
+        customRules = cloneCustomRules(customRuleDrafts);
+        customRuleDrafts = cloneCustomRules(customRules);
+        rebuildCompiledCustomRules();
+        saveCustomRules();
+        showCustomRuleErrors = false;
+        renderCustomRules();
+        applyCustomRulesToCurrentText();
+        setRulesStatus("Saved and applied.");
+      }
+
+      function showDiscardConfirmation() {
+        discardOverlay.hidden = false;
+        keepEditingButton.focus();
+      }
+
+      function hideDiscardConfirmation() {
+        discardOverlay.hidden = true;
+        advancedCloseButton.focus();
+      }
+
+      function openAdvancedFeatures() {
+        customRuleDrafts = cloneCustomRules(customRules);
+        showCustomRuleErrors = false;
+        discardOverlay.hidden = true;
+        advancedBackdrop.hidden = false;
+        document.body.classList.add("advanced-open");
+        document.querySelector?.(".app")?.setAttribute("inert", "");
+        advancedButton.setAttribute("aria-expanded", "true");
+        renderCustomRules();
+        advancedCloseButton.focus();
+      }
+
+      function closeAdvancedFeatures() {
+        advancedBackdrop.hidden = true;
+        document.body.classList.remove("advanced-open");
+        document.querySelector?.(".app")?.removeAttribute("inert");
+        advancedButton.setAttribute("aria-expanded", "false");
+        advancedButton.focus();
+      }
+
+      function requestCloseAdvancedFeatures() {
+        if (customRulesHaveUnsavedChanges()) {
+          showDiscardConfirmation();
+          return;
+        }
+        closeAdvancedFeatures();
+      }
+
+      function discardChangesAndClose() {
+        customRuleDrafts = cloneCustomRules(customRules);
+        hideDiscardConfirmation();
+        closeAdvancedFeatures();
+      }
+
+      function exportCustomRules() {
+        const json = JSON.stringify({
+          version: 1,
+          rules: customRules.map(portableCustomRule)
+        }, null, 2);
+        const url = URL.createObjectURL(new Blob([`${json}\n`], { type: "application/json" }));
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "one-page-pii-redactor-rules.json";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 0);
+        setRulesStatus("Exported custom rules.");
+      }
+
+      async function importCustomRules(file) {
+        if (!file) return;
+        try {
+          const rules = parseCustomRuleSet(await file.text());
+          if (customRuleDrafts.length > 0 && !window.confirm("Replace the rules currently in the editor?")) return;
+          customRuleDrafts = cloneCustomRules(rules);
+          showCustomRuleErrors = false;
+          renderCustomRules();
+          setRulesStatus(`Imported ${rules.length.toLocaleString()} custom ${rules.length === 1 ? "rule" : "rules"}. Save to apply.`);
+        } catch (error) {
+          setRulesStatus(error instanceof Error ? error.message : "Could not import that rule set.", true);
+        } finally {
+          rulesImportInput.value = "";
+        }
+      }
+
+      function noteCustomRuleDraftChange() {
+        setRulesStatus("");
+        updateCustomRulesDirtyState();
+      }
+
+      function moveCustomRuleDraft(ruleId, direction) {
+        const index = customRuleDrafts.findIndex((rule) => rule.id === ruleId);
+        const nextIndex = index + direction;
+        if (index < 0 || nextIndex < 0 || nextIndex >= customRuleDrafts.length) return;
+        const reordered = [...customRuleDrafts];
+        [reordered[index], reordered[nextIndex]] = [reordered[nextIndex], reordered[index]];
+        customRuleDrafts = reordered;
+        renderCustomRules();
+        rulesList.querySelector?.(`[data-rule-id="${ruleId}"] [data-action="drag"]`)?.focus();
+      }
+
+      function beginRuleDrag(event) {
+        const handle = event.target.closest?.('[data-action="drag"]');
+        if (!handle || event.button !== 0) return;
+        const row = handle.closest("[data-rule-id]");
+        if (!row) return;
+        event.preventDefault();
+        ruleDragState = { handle, row, pointerId: event.pointerId };
+        handle.setPointerCapture?.(event.pointerId);
+        row.classList.add("dragging");
+        rulesList.classList.add("drag-active");
+      }
+
+      function moveRuleDrag(event) {
+        if (!ruleDragState || event.pointerId !== ruleDragState.pointerId) return;
+        const target = document.elementFromPoint?.(event.clientX, event.clientY)?.closest?.("[data-rule-id]");
+        if (!target || target === ruleDragState.row || target.parentElement !== rulesList) return;
+        const targetBounds = target.getBoundingClientRect();
+        const insertBeforeTarget = event.clientY < targetBounds.top + targetBounds.height / 2;
+        rulesList.insertBefore(ruleDragState.row, insertBeforeTarget ? target : target.nextSibling);
+      }
+
+      function finishRuleDrag(event) {
+        if (!ruleDragState || event.pointerId !== ruleDragState.pointerId) return;
+        ruleDragState.handle.releasePointerCapture?.(event.pointerId);
+        ruleDragState.row.classList.remove("dragging");
+        rulesList.classList.remove("drag-active");
+        const order = [...rulesList.querySelectorAll("[data-rule-id]")].map((row) => row.dataset.ruleId);
+        const byId = new Map(customRuleDrafts.map((rule) => [rule.id, rule]));
+        customRuleDrafts = order.map((id) => byId.get(id)).filter(Boolean);
+        ruleDragState = null;
+        noteCustomRuleDraftChange();
+      }
+
       function luhn(value) {
         if (!/^\d{13,19}$/.test(value)) return false;
         let sum = 0;
@@ -851,6 +1975,99 @@
           doubleDigit = !doubleDigit;
         }
         return sum % 10 === 0;
+      }
+
+      function isCompletePhoneValue(value, text, start) {
+        if (value.replace(/\D/g, "").length < 10) return false;
+
+        const end = start + value.length;
+        const leftContext = text.slice(Math.max(0, start - 2), start);
+        const rightContext = text.slice(end, end + 2);
+        return !/\d[.-]$/.test(leftContext) && !/^[.-]\d/.test(rightContext);
+      }
+
+      function collectDelimitedBirthDateMatches(text, detectorIndex) {
+        const lines = [];
+        let lineStart = 0;
+        for (const line of text.split("\n")) {
+          const value = line.endsWith("\r") ? line.slice(0, -1) : line;
+          lines.push({ value, start: lineStart });
+          lineStart += line.length + 1;
+        }
+
+        const matches = [];
+        for (let lineIndex = 0; lineIndex < lines.length - 1; lineIndex += 1) {
+          const headerLine = lines[lineIndex];
+          const delimiter = headerLine.value.includes("\t") ? "\t" : headerLine.value.includes(",") ? "," : null;
+          if (!delimiter) continue;
+
+          const headers = parseDelimitedFields(headerLine.value, delimiter);
+          const birthColumns = [];
+          headers.forEach((field, index) => {
+            const normalized = field.value.toLowerCase().replace(/[^a-z]/g, "");
+            if (normalized === "dob" || normalized === "dateofbirth" || normalized === "birthdate") {
+              birthColumns.push(index);
+            }
+          });
+          if (birthColumns.length === 0) continue;
+
+          for (let rowIndex = lineIndex + 1; rowIndex < lines.length; rowIndex += 1) {
+            const rowLine = lines[rowIndex];
+            if (!rowLine.value.trim()) break;
+            const fields = parseDelimitedFields(rowLine.value, delimiter);
+            if (fields.length !== headers.length) break;
+
+            for (const column of birthColumns) {
+              const field = fields[column];
+              if (!field || !isBirthDateShape(field.value)) continue;
+              matches.push({
+                start: rowLine.start + field.start,
+                end: rowLine.start + field.end,
+                value: field.value,
+                type: "DATE_OF_BIRTH",
+                label: "date of birth",
+                priority: matchPriorities.DATE_OF_BIRTH,
+                detectorIndex,
+                protect: false,
+                propagate: false
+              });
+            }
+          }
+        }
+        return matches;
+      }
+
+      function parseDelimitedFields(line, delimiter) {
+        const fields = [];
+        let fieldStart = 0;
+        let inQuotes = false;
+        for (let index = 0; index <= line.length; index += 1) {
+          const character = line[index];
+          if (character === '"') {
+            if (inQuotes && line[index + 1] === '"') {
+              index += 1;
+            } else {
+              inQuotes = !inQuotes;
+            }
+          }
+          if (index < line.length && (character !== delimiter || inQuotes)) continue;
+
+          let start = fieldStart;
+          let end = index;
+          while (start < end && /\s/.test(line[start])) start += 1;
+          while (end > start && /\s/.test(line[end - 1])) end -= 1;
+          if (line[start] === '"' && line[end - 1] === '"') {
+            start += 1;
+            end -= 1;
+          }
+          fields.push({ value: line.slice(start, end), start, end });
+          fieldStart = index + 1;
+        }
+        return fields;
+      }
+
+      function isBirthDateShape(value) {
+        return /^(?:\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}[/-]\d{1,2}[/-]\d{1,2}|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.?[ \t]+\d{1,2},?[ \t]+\d{4})$/i.test(value);
       }
 
       function isValidIpv6(value) {
@@ -871,7 +2088,16 @@
         return hasCompression ? segments.length < 8 : segments.length === 8;
       }
 
-      function nextPlaceholder(type, value) {
+      function nextPlaceholder(type, value, customLabel = "") {
+        if (customLabel) {
+          const key = `${type}\u0000${value.toLowerCase()}`;
+          if (placeholderByValue.has(key)) return placeholderByValue.get(key);
+          const count = (placeholderCounts.get(type) || 0) + 1;
+          placeholderCounts.set(type, count);
+          const placeholder = `${customLabel} ${count}`;
+          placeholderByValue.set(key, placeholder);
+          return placeholder;
+        }
         if (type === "EMAIL") return nextEmailPlaceholder(value);
         if (type === "PHONE") return nextSimplePlaceholder(type, "phone", value);
         if (type === "ACCOUNT") return nextSimplePlaceholder(type, "account", value);
@@ -1191,8 +2417,52 @@
         return offset < 0 ? null : [match.index + offset, match.index + offset + match[detector.group].length];
       }
 
-      function collectMatches(text) {
+      class CustomRuleMatchLimitError extends Error {}
+
+      function collectCustomMatches(text) {
         const matches = [];
+        compiledCustomRules.forEach(({ rule, ruleIndex, pattern }) => {
+          const label = rule.label.trim();
+          const type = `CUSTOM:${label.toLowerCase()}`;
+          const priority = customRulePriority - ruleIndex;
+          const addMatch = (start, end) => {
+            if (matches.length >= maxCustomMatches) throw new CustomRuleMatchLimitError();
+            matches.push({
+              start,
+              end,
+              value: text.slice(start, end),
+              type,
+              label,
+              placeholderLabel: label,
+              contextStart: start,
+              contextEnd: end,
+              priority,
+              detectorIndex: ruleIndex,
+              protect: false,
+              propagate: false
+            });
+          };
+
+          if (rule.matchType === "text") {
+            let start = 0;
+            while ((start = text.indexOf(rule.match, start)) !== -1) {
+              addMatch(start, start + rule.match.length);
+              start += rule.match.length;
+            }
+            return;
+          }
+
+          pattern.lastIndex = 0;
+          let match;
+          while ((match = pattern.exec(text)) !== null) {
+            addMatch(match.index, match.index + match[0].length);
+          }
+        });
+        return matches;
+      }
+
+      function collectMatches(text) {
+        const matches = collectCustomMatches(text);
         for (const [detectorIndex, detector] of detectors.entries()) {
           detector.pattern.lastIndex = 0;
           let match;
@@ -1225,12 +2495,71 @@
               value: normalized.value,
               type: detector.type,
               label: detector.label,
+              contextStart: match.index,
+              contextEnd: match.index + match[0].length,
               priority: detector.priority ?? matchPriorities[detector.type] ?? 0,
-              detectorIndex
+              detectorIndex,
+              protect: detector.protect === true,
+              propagate: detector.propagate === true
             });
           }
         }
-        return mergeMatches(matches);
+        matches.push(...collectDelimitedBirthDateMatches(text, detectors.length));
+        const initiallySelected = mergeMatches(matches);
+        const propagated = collectPropagatedMatches(text, initiallySelected);
+        return mergeMatches(matches.concat(propagated)).filter((match) => !match.protect);
+      }
+
+      function collectPropagatedMatches(text, selected) {
+        const anchorsByValue = new Map();
+        for (const match of selected) {
+          if (match.protect || !match.propagate) continue;
+          if (match.value.replace(/[^A-Z0-9]/gi, "").length < 5) continue;
+
+          const key = match.value.toLowerCase();
+          let entry = anchorsByValue.get(key);
+          if (!entry) {
+            entry = { types: new Set(), anchors: [] };
+            anchorsByValue.set(key, entry);
+          }
+          entry.types.add(match.type);
+          entry.anchors.push(match);
+        }
+
+        const lowerText = text.toLowerCase();
+        const propagated = [];
+        for (const [key, entry] of anchorsByValue) {
+          if (entry.types.size !== 1) continue;
+          const anchor = entry.anchors[0];
+          let start = 0;
+          while ((start = lowerText.indexOf(key, start)) !== -1) {
+            const end = start + key.length;
+            const before = start > 0 ? text[start - 1] : "";
+            const after = end < text.length ? text[end] : "";
+            const isExactAnchor = entry.anchors.some((match) => match.start === start && match.end === end);
+            const isAnchorLabel = entry.anchors.some((match) => (
+              start >= match.contextStart
+              && end <= match.contextEnd
+              && (start !== match.start || end !== match.end)
+            ));
+            if (!isExactAnchor && !isAnchorLabel && !isIdentifierContinuation(before) && !isIdentifierContinuation(after)) {
+              propagated.push({
+                ...anchor,
+                start,
+                end,
+                value: text.slice(start, end),
+                propagate: false,
+                propagated: true
+              });
+            }
+            start = end;
+          }
+        }
+        return propagated;
+      }
+
+      function isIdentifierContinuation(character) {
+        return Boolean(character) && /[\p{L}\p{N}_.@$-]/u.test(character);
       }
 
       function rangesOverlap(a, b) {
@@ -1271,7 +2600,7 @@
 
         matches.forEach((match, index) => {
           const id = `r${index}`;
-          const placeholder = namePlaceholders.get(index) || nextPlaceholder(match.type, match.value);
+          const placeholder = namePlaceholders.get(index) || nextPlaceholder(match.type, match.value, match.placeholderLabel);
           redactions.set(id, { ...match, placeholder });
           parts.push({ kind: "text", value: text.slice(cursor, match.start) });
           parts.push({ kind: "redaction", id });
@@ -1343,7 +2672,9 @@
         if (!rawSourceText) {
           statusText.innerHTML = `<strong>0</strong> characters, <strong>0</strong> redactions`;
         } else if (result.skipped) {
-          statusText.innerHTML = `<strong>${rawSourceText.length.toLocaleString()}</strong> ${charLabel}. Redaction skipped; limit is <strong>${maxRedactionCharacters.toLocaleString()}</strong> characters`;
+          statusText.innerHTML = result.reason === "custom-match-limit"
+            ? `<strong>${rawSourceText.length.toLocaleString()}</strong> ${charLabel}. Redaction skipped; a custom rule exceeded <strong>${maxCustomMatches.toLocaleString()}</strong> matches`
+            : `<strong>${rawSourceText.length.toLocaleString()}</strong> ${charLabel}. Redaction skipped; limit is <strong>${maxRedactionCharacters.toLocaleString()}</strong> characters`;
         } else {
           statusText.innerHTML = `<strong>${rawSourceText.length.toLocaleString()}</strong> ${charLabel}, <strong>${result.count.toLocaleString()}</strong> redactions applied in <strong>${result.elapsed.toFixed(1)} ms</strong>`;
         }
@@ -1386,7 +2717,7 @@
       function pasteTextAt(text, start, end = start) {
         if (!text) return;
         const result = processRawText(insertTextAt(text, start, end), { autoCopy: true });
-        setCopyState(result.skipped ? "Text too large to redact" : "Pasted and redacted", result.skipped);
+        setCopyState(result.skipped ? "Redaction skipped" : "Pasted and redacted", result.skipped);
       }
 
       function pasteIntoEditor(text) {
@@ -1428,10 +2759,32 @@
           return currentResult;
         }
 
-        if (copyState.textContent === "Text too large to redact") {
+        if (copyState.textContent === "Text too large to redact" || copyState.textContent === "Redaction skipped") {
           setCopyState("");
         }
-        currentResult = redact(rawSourceText);
+        try {
+          currentResult = redact(rawSourceText);
+        } catch (error) {
+          if (!(error instanceof CustomRuleMatchLimitError)) throw error;
+          window.clearTimeout(inputRenderTimer);
+          window.clearTimeout(autoCopyTimer);
+          redactions.clear();
+          restoredIds.clear();
+          redactedPlainText = "";
+          redactionBox.innerHTML = "";
+          currentResult = {
+            parts: [],
+            plain: "",
+            count: 0,
+            elapsed: 0,
+            skipped: true,
+            reason: "custom-match-limit"
+          };
+          updateStatus(currentResult);
+          showInputMode({ focus: false });
+          setCopyState("Redaction skipped", true);
+          return currentResult;
+        }
         redactedPlainText = currentResult.plain;
         if (render) {
           window.clearTimeout(inputRenderTimer);
@@ -1476,7 +2829,7 @@
         }
 
         if (currentResult?.skipped) {
-          setCopyState("Text too large to redact", true);
+          setCopyState("Redaction skipped", true);
           return;
         }
 
@@ -1587,6 +2940,153 @@
         pasteIntoRedactionView(text, event.target);
       });
 
+      advancedButton.addEventListener("click", openAdvancedFeatures);
+      advancedCloseButton.addEventListener("click", requestCloseAdvancedFeatures);
+      rulesSaveButton.addEventListener("click", commitCustomRuleDrafts);
+      keepEditingButton.addEventListener("click", hideDiscardConfirmation);
+      discardChangesButton.addEventListener("click", discardChangesAndClose);
+      advancedBackdrop.addEventListener("click", (event) => {
+        if (event.target === advancedBackdrop) requestCloseAdvancedFeatures();
+      });
+      advancedDrawer.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+          const openTypeMenu = rulesList.querySelector(".rule-select-menu:not([hidden])");
+          if (openTypeMenu) {
+            event.preventDefault();
+            const toggle = openTypeMenu.closest(".rule-select-wrap")?.querySelector('[data-action="toggle-type"]');
+            closeRuleTypeMenus();
+            toggle?.focus();
+            return;
+          }
+          event.preventDefault();
+          if (discardOverlay.hidden) {
+            requestCloseAdvancedFeatures();
+          } else {
+            hideDiscardConfirmation();
+          }
+          return;
+        }
+        if (event.key !== "Tab") return;
+        const focusScope = discardOverlay.hidden ? advancedDrawer : discardOverlay;
+        const focusable = [...focusScope.querySelectorAll('button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])')]
+          .filter((element) => !element.hidden && !element.closest("[hidden]"));
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      });
+
+      advancedDrawer.addEventListener("click", (event) => {
+        if (!event.target.closest(".rule-select-wrap")) closeRuleTypeMenus();
+      });
+
+      ruleAddButton.addEventListener("click", () => {
+        if (customRuleDrafts.length >= maxCustomRules) {
+          setRulesStatus(`Custom rules are limited to ${maxCustomRules}.`, true);
+          return;
+        }
+        const labels = new Set(customRuleDrafts.map((rule) => rule.label.trim().toLowerCase()));
+        let defaultRuleNumber = 1;
+        while (labels.has(`rule ${defaultRuleNumber}`)) defaultRuleNumber += 1;
+        const rule = createCustomRule({ label: `Rule ${defaultRuleNumber}`, autoLabel: true });
+        customRuleDrafts = [...customRuleDrafts, rule];
+        noteCustomRuleDraftChange();
+        renderCustomRules();
+      });
+
+      rulesList.addEventListener("focusin", (event) => {
+        if (event.target?.dataset?.role !== "label") return;
+        const ruleRow = event.target.closest("[data-rule-id]");
+        const rule = customRuleDrafts.find((candidate) => candidate.id === ruleRow?.dataset?.ruleId);
+        if (!rule?.autoLabel) return;
+        rule.autoLabel = false;
+        rule.label = "";
+        event.target.value = "";
+        refreshRuleRow(ruleRow, rule);
+        noteCustomRuleDraftChange();
+      });
+
+      rulesList.addEventListener("input", (event) => {
+        const role = event.target?.dataset?.role;
+        if (role !== "label" && role !== "match") return;
+        const ruleRow = event.target.closest("[data-rule-id]");
+        const rule = customRuleDrafts.find((candidate) => candidate.id === ruleRow?.dataset?.ruleId);
+        if (!rule) return;
+        rule[role] = event.target.value;
+        refreshRuleRow(ruleRow, rule);
+        noteCustomRuleDraftChange();
+      });
+
+      rulesList.addEventListener("click", (event) => {
+        const control = event.target.closest("[data-action]");
+        if (!control) return;
+        const ruleRow = control.closest("[data-rule-id]");
+        const index = customRuleDrafts.findIndex((candidate) => candidate.id === ruleRow?.dataset?.ruleId);
+        if (index === -1) return;
+        const action = control.dataset.action;
+        if (action === "toggle-type") {
+          const menu = ruleRow.querySelector(".rule-select-menu");
+          if (menu.hidden) {
+            openRuleTypeMenu(ruleRow);
+          } else {
+            closeRuleTypeMenus();
+          }
+          return;
+        }
+        if (action === "choose-type") {
+          chooseRuleType(ruleRow, customRuleDrafts[index], control.dataset.matchType);
+          closeRuleTypeMenus();
+          ruleRow.querySelector('[data-action="toggle-type"]')?.focus();
+          return;
+        }
+        if (action === "delete") {
+          customRuleDrafts = customRuleDrafts.filter((_, ruleIndex) => ruleIndex !== index);
+          noteCustomRuleDraftChange();
+          renderCustomRules();
+          return;
+        }
+      });
+
+      rulesList.addEventListener("keydown", (event) => {
+        const toggle = event.target.closest?.('[data-action="toggle-type"]');
+        if (toggle && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
+          event.preventDefault();
+          openRuleTypeMenu(toggle.closest("[data-rule-id]"), { focusOption: true });
+          return;
+        }
+
+        const option = event.target.closest?.('[data-action="choose-type"]');
+        if (option && ["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
+          event.preventDefault();
+          const options = [...option.closest(".rule-select-menu").querySelectorAll(".rule-select-option")];
+          const index = options.indexOf(option);
+          const nextIndex = event.key === "Home" ? 0 : event.key === "End" ? options.length - 1 : (index + (event.key === "ArrowDown" ? 1 : -1) + options.length) % options.length;
+          options[nextIndex]?.focus();
+          return;
+        }
+
+        if (event.target?.dataset?.action !== "drag" || !event.altKey) return;
+        const direction = event.key === "ArrowUp" ? -1 : event.key === "ArrowDown" ? 1 : 0;
+        if (!direction) return;
+        event.preventDefault();
+        moveCustomRuleDraft(event.target.closest("[data-rule-id]")?.dataset?.ruleId, direction);
+      });
+
+      rulesList.addEventListener("pointerdown", beginRuleDrag);
+      rulesList.addEventListener("pointermove", moveRuleDrag);
+      rulesList.addEventListener("pointerup", finishRuleDrag);
+      rulesList.addEventListener("pointercancel", finishRuleDrag);
+
+      rulesImportButton.addEventListener("click", () => rulesImportInput.click());
+      rulesImportInput.addEventListener("change", () => importCustomRules(rulesImportInput.files?.[0]));
+      rulesExportButton.addEventListener("click", exportCustomRules);
+
       copyButton.addEventListener("click", () => copyRedacted({ automatic: false }));
       pasteButton.addEventListener("click", pasteFromClipboard);
 
@@ -1602,6 +3102,10 @@
         setCopyState(autoCopyToggle.checked ? "Auto-copy on" : "Auto-copy off");
       });
 
+      customRules = loadCustomRules();
+      customRuleDrafts = cloneCustomRules(customRules);
+      rebuildCompiledCustomRules();
+      renderCustomRules();
       processRawText("", { autoCopy: false, render: false });
       showInputMode({ focus: false });
     })();

@@ -9,6 +9,8 @@ Live demo: [onepageredactor.pages.dev](https://onepageredactor.pages.dev/)
 
 Paste text to automatically redact PII. Hover over a redaction to see what was removed. Click to undo.
 
+Use Advanced Features to add local plain-text or regular-expression rules and move rule sets between browsers as JSON.
+
 ## Use
 
 1. Download the `index.html` file locally.
