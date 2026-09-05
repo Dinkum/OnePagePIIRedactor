@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="app-version" content="0.1.2">
+  <meta name="app-version" content="0.1.3">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; font-src 'none'; base-uri 'none'; form-action 'none'">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23090b10'/%3E%3Cpath d='M14 20h36v8H14zm0 16h24v8H14z' fill='%23fb7185'/%3E%3Cpath d='M42 36h8v8h-8z' fill='%235eead4'/%3E%3C/svg%3E">
   <title>One Page PII Redactor</title>
@@ -56,6 +56,8 @@
     }
 
     .app {
+      height: 100vh;
+      height: 100dvh;
       min-height: 100vh;
       min-height: 100dvh;
       display: grid;
@@ -1674,8 +1676,9 @@
             version: 1,
             rules: customRules.map(portableCustomRule)
           }));
+          return true;
         } catch {
-          // Some file:// or private browsing contexts may block localStorage.
+          return false;
         }
       }
 
@@ -1829,11 +1832,11 @@
         customRules = cloneCustomRules(customRuleDrafts);
         customRuleDrafts = cloneCustomRules(customRules);
         rebuildCompiledCustomRules();
-        saveCustomRules();
+        const persisted = saveCustomRules();
         showCustomRuleErrors = false;
         renderCustomRules();
         applyCustomRulesToCurrentText();
-        setRulesStatus("Saved and applied.");
+        setRulesStatus(persisted ? "Saved and applied." : "Applied for this session only. Export rules to keep them.", !persisted);
       }
 
       function showDiscardConfirmation() {
@@ -2464,6 +2467,7 @@
       function collectMatches(text) {
         const matches = collectCustomMatches(text);
         for (const [detectorIndex, detector] of detectors.entries()) {
+          if (detector.type === "EMAIL" && !text.includes("@")) continue;
           detector.pattern.lastIndex = 0;
           let match;
           while ((match = detector.pattern.exec(text)) !== null) {
@@ -2507,7 +2511,7 @@
         matches.push(...collectDelimitedBirthDateMatches(text, detectors.length));
         const initiallySelected = mergeMatches(matches);
         const propagated = collectPropagatedMatches(text, initiallySelected);
-        return mergeMatches(matches.concat(propagated)).filter((match) => !match.protect);
+        return (propagated.length ? mergeMatches(matches.concat(propagated)) : initiallySelected).filter((match) => !match.protect);
       }
 
       function collectPropagatedMatches(text, selected) {
@@ -2526,7 +2530,9 @@
           entry.anchors.push(match);
         }
 
-        const lowerText = text.toLowerCase();
+        if (anchorsByValue.size === 0) return [];
+        // Anchor identifiers are ASCII; preserve source offsets when folding case.
+        const lowerText = text.replace(/[A-Z]/g, (character) => character.toLowerCase());
         const propagated = [];
         for (const [key, entry] of anchorsByValue) {
           if (entry.types.size !== 1) continue;
@@ -2577,11 +2583,18 @@
       function mergeMatches(matches) {
         const selected = [];
         for (const candidate of [...matches].sort(compareMatchRank)) {
-          if (!selected.some((match) => rangesOverlap(candidate, match))) {
-            selected.push(candidate);
+          let low = 0;
+          let high = selected.length;
+          while (low < high) {
+            const middle = (low + high) >>> 1;
+            if (selected[middle].start < candidate.start) low = middle + 1;
+            else high = middle;
           }
+          if (low > 0 && rangesOverlap(candidate, selected[low - 1])) continue;
+          if (low < selected.length && rangesOverlap(candidate, selected[low])) continue;
+          selected.splice(low, 0, candidate);
         }
-        return selected.sort((a, b) => a.start - b.start || a.end - b.end);
+        return selected;
       }
 
       function redact(text) {
@@ -2675,6 +2688,8 @@
           statusText.innerHTML = result.reason === "custom-match-limit"
             ? `<strong>${rawSourceText.length.toLocaleString()}</strong> ${charLabel}. Redaction skipped; a custom rule exceeded <strong>${maxCustomMatches.toLocaleString()}</strong> matches`
             : `<strong>${rawSourceText.length.toLocaleString()}</strong> ${charLabel}. Redaction skipped; limit is <strong>${maxRedactionCharacters.toLocaleString()}</strong> characters`;
+        } else if (result.pending) {
+          statusText.innerHTML = `<strong>${rawSourceText.length.toLocaleString()}</strong> ${charLabel}`;
         } else {
           statusText.innerHTML = `<strong>${rawSourceText.length.toLocaleString()}</strong> ${charLabel}, <strong>${result.count.toLocaleString()}</strong> redactions applied in <strong>${result.elapsed.toFixed(1)} ms</strong>`;
         }
@@ -2735,10 +2750,10 @@
       }
 
       function processRawText(text, { autoCopy = true, render = true } = {}) {
+        window.clearTimeout(inputRenderTimer);
+        window.clearTimeout(autoCopyTimer);
         rawSourceText = text;
         if (rawSourceText.length > maxRedactionCharacters) {
-          window.clearTimeout(inputRenderTimer);
-          window.clearTimeout(autoCopyTimer);
           redactions.clear();
           restoredIds.clear();
           redactedPlainText = "";
@@ -2766,8 +2781,6 @@
           currentResult = redact(rawSourceText);
         } catch (error) {
           if (!(error instanceof CustomRuleMatchLimitError)) throw error;
-          window.clearTimeout(inputRenderTimer);
-          window.clearTimeout(autoCopyTimer);
           redactions.clear();
           restoredIds.clear();
           redactedPlainText = "";
@@ -2787,7 +2800,6 @@
         }
         redactedPlainText = currentResult.plain;
         if (render) {
-          window.clearTimeout(inputRenderTimer);
           renderResult(currentResult);
           showRedactionMode();
         }
@@ -2802,10 +2814,27 @@
 
       function queueTypedRedaction() {
         window.clearTimeout(inputRenderTimer);
-        if (!rawSourceText || !currentResult || currentResult.count === 0) return;
+        window.clearTimeout(autoCopyTimer);
+        rawSourceText = editorInput.value;
+        currentResult = null;
+        redactedPlainText = "";
+        redactionBox.innerHTML = "";
+        redactions.clear();
+        restoredIds.clear();
+        setCopyState("");
+        if (!rawSourceText || rawSourceText.length > maxRedactionCharacters) {
+          processRawText(rawSourceText, { autoCopy: false, render: false });
+          return;
+        }
+        updateStatus({ pending: true });
         inputRenderTimer = window.setTimeout(() => {
           if (editorInput.hidden) return;
-          processRawText(editorInput.value, { autoCopy: true, render: true });
+          const result = processRawText(editorInput.value, { autoCopy: false, render: false });
+          if (!result.skipped && result.count > 0) {
+            renderResult(result);
+            showRedactionMode();
+            if (autoCopyEnabled()) queueAutoCopy();
+          }
         }, 650);
       }
 
@@ -2900,10 +2929,7 @@
         pasteIntoEditor(text);
       });
 
-      editorInput.addEventListener("input", () => {
-        processRawText(editorInput.value, { autoCopy: false, render: false });
-        queueTypedRedaction();
-      });
+      editorInput.addEventListener("input", queueTypedRedaction);
 
       redactionBox.addEventListener("click", (event) => {
         const button = event.target.closest(".redaction");
