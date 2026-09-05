@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="app-version" content="0.1.3">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; font-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="app-version" content="0.1.4">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; worker-src blob:; font-src 'none'; base-uri 'none'; form-action 'none'">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23090b10'/%3E%3Cpath d='M14 20h36v8H14zm0 16h24v8H14z' fill='%23fb7185'/%3E%3Cpath d='M42 36h8v8h-8z' fill='%235eead4'/%3E%3C/svg%3E">
   <title>One Page PII Redactor</title>
   <style>
@@ -313,36 +313,67 @@
       outline-offset: 1px;
     }
 
-    .redaction::after {
-      content: attr(data-reveal);
-      position: absolute;
-      left: 50%;
-      top: calc(100% + 8px);
-      z-index: 4;
-      width: max-content;
-      max-width: min(360px, 70vw);
+    .review-tooltip {
+      position: fixed;
+      z-index: 30;
+      max-width: min(360px, calc(100vw - 16px));
+      max-height: min(320px, 45vh);
+      overflow: auto;
       padding: 8px 10px;
       border: 1px solid #475569;
       border-radius: 7px;
       background: #f8fafc;
       color: #0f172a;
-      box-shadow: 0 14px 40px rgba(0, 0, 0, 0.34);
-      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      font-size: 12px;
-      line-height: 1.35;
-      white-space: normal;
+      font: 12px/1.4 ui-sans-serif, system-ui, sans-serif;
       overflow-wrap: anywhere;
-      opacity: 0;
-      pointer-events: none;
-      transform: translate(-50%, -4px);
-      transition: opacity 100ms ease, transform 100ms ease;
+      white-space: pre-wrap;
     }
 
-    .redaction:hover::after,
-    .redaction:focus-visible::after {
-      opacity: 1;
-      transform: translate(-50%, 0);
+    .review-tooltip[hidden] { display: none; }
+
+    .redaction.suggested {
+      border-color: #d6a63a;
+      background: rgba(234, 179, 8, 0.16);
+      color: #fde68a;
+      border-bottom-style: dashed;
     }
+
+    .redaction.suggested:hover, .redaction.suggested:focus-visible {
+      background: rgba(234, 179, 8, 0.28);
+      outline-color: #d6a63a;
+    }
+
+    .suggestion-setting {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 20px;
+      margin-bottom: 20px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .info-button {
+      border: 1px solid #64748b;
+      border-radius: 50%;
+      width: 20px;
+      height: 20px;
+      padding: 0;
+      background: transparent;
+      color: #cbd5e1;
+      font: 12px Georgia, serif;
+      cursor: help;
+    }
+
+    .rules-recovery {
+      margin-bottom: 16px;
+      padding: 12px;
+      border: 1px solid #d6a63a;
+      border-radius: 8px;
+      color: #fde68a;
+      font-size: 13px;
+    }
+
+    .rules-recovery p { margin: 0 0 10px; }
 
     .redaction.restored {
       border-color: #5eead4;
@@ -391,7 +422,7 @@
       white-space: nowrap;
     }
 
-    .copy-state:not(:empty) {
+    .copy-state:not(:empty):not(.warn) {
       animation: copyFlash 1600ms ease both;
     }
 
@@ -1178,6 +1209,18 @@
         </button>
       </header>
       <div class="advanced-content">
+        <div class="suggestion-setting">
+          <label class="auto-copy-toggle">
+            <input id="suggestRedactionsToggle" type="checkbox">
+            <span class="toggle-switch" aria-hidden="true"></span>
+            <span>Suggest redactions</span>
+          </label>
+          <button class="info-button" id="suggestionsInfo" type="button" aria-label="About suggested redactions" data-help="Uses Shannon entropy to highlight random-looking strings that may be secrets. Yellow suggestions stay visible until you click to redact them. Hashes and public IDs may also be suggested; some secrets may be missed.">i</button>
+        </div>
+        <div class="rules-recovery" id="rulesRecovery" role="alert" hidden>
+          <p>Saved rules could not be loaded. Copy is paused. Import a backup below and save it, or reset saved rules.</p>
+          <button class="button" id="rulesResetButton" type="button">Reset saved rules</button>
+        </div>
         <section class="rules-section" aria-labelledby="customRulesTitle">
           <div class="rules-heading">
             <h3 id="customRulesTitle">Custom Rules</h3>
@@ -1222,7 +1265,9 @@
     </section>
   </div>
 
-  <script>
+  <div class="review-tooltip" id="reviewTooltip" role="tooltip" hidden></div>
+
+  <script data-cfasync="false">
     (() => {
       "use strict";
 
@@ -1251,6 +1296,19 @@
       const keepEditingButton = document.getElementById("keepEditingButton");
       const discardChangesButton = document.getElementById("discardChangesButton");
 
+      const suggestRedactionsToggle = document.getElementById("suggestRedactionsToggle");
+      const suggestionsInfo = document.getElementById("suggestionsInfo");
+      const reviewTooltip = document.getElementById("reviewTooltip");
+      const rulesRecovery = document.getElementById("rulesRecovery");
+      const rulesResetButton = document.getElementById("rulesResetButton");
+      let tooltipTarget = null;
+      let tooltipHideTimer = 0;
+      let rulesLoadFailed = false;
+      let processingGeneration = 0;
+      let pendingJob = null;
+      const customRegexDeadlineMs = 500;
+      const suggestionsStorageKey = "one-page-pii-redactor:suggest-redactions";
+      const acceptedSuggestions = new Set();
       const redactions = new Map();
       const restoredIds = new Set();
       let currentResult = null;
@@ -1275,7 +1333,25 @@
       const maxCustomMatches = 5000;
       const customRulePriority = 500;
 
+      const credentialAssignment = String.raw`\b(?:password|passwd|pwd|api[_ -]?key|api[_ -]?secret|access[_ -]?token|refresh[_ -]?token|client[_ -]?secret|secret[_ -]?key)\b["']?[ \t]*[:=][ \t]*`;
       const detectors = [
+        {
+          type: "NAME",
+          label: "person name",
+          pattern: /\b(?:Name|Full name|Legal name|Preferred name|Customer Name|Patient|Client|Employee|Contact|Member|Applicant|Resident|Recipient|Cardholder)[ \t]*[:=#-][ \t]*["']?((?:\p{Lu}[\p{L}\p{M}'-]+)(?:[ \t]+(?:\p{Lu}[\p{L}\p{M}'-]+|de|del|da|das|dos|van|von|bin|bint|al|el|la|le|du)){0,4})(?![\p{L}\p{M}])/gu,
+          group: 1
+        },
+        ...[
+          String.raw`"((?:\\.|[^"\\\r\n])+)"`,
+          String.raw`'((?:\\.|[^'\\\r\n])+)'`,
+          String.raw`([^\s,"';}{]+)`
+        ].map((valuePattern) => ({
+          type: "TOKEN",
+          label: "secret token",
+          pattern: new RegExp(credentialAssignment + valuePattern, "gi"),
+          group: 1,
+          verbatim: true
+        })),
         {
           type: "PROTECTED_WINDOWS_SID",
           pattern: /(?<![\p{L}\p{N}_-])S-\d+-\d+(?:-\d+){0,15}(?![\p{L}\p{N}_-])/giu,
@@ -1593,13 +1669,11 @@
         if (rule.matchType === "text" && rule.match.length < 2) return "Plain-text matches need at least 2 characters.";
         if (rule.match.length > maxCustomMatchLength) return `Matches can be up to ${maxCustomMatchLength} characters.`;
         if (rule.matchType === "regex") {
-          let pattern;
           try {
-            pattern = new RegExp(rule.match, "gu");
+            new RegExp(rule.match, "gu");
           } catch {
             return "Enter a valid JavaScript regular expression.";
           }
-          if (pattern.test("")) return "The expression must not match empty text.";
           const safetyError = customRegexSafetyError(rule.match);
           if (safetyError) return safetyError;
         }
@@ -1643,6 +1717,10 @@
           if (!rule || typeof rule !== "object" || Array.isArray(rule)) {
             throw new Error(`Rule ${index + 1} is not valid.`);
           }
+          if (rule.matchType !== "text" && rule.matchType !== "regex") throw new Error(`Rule ${index + 1}: Choose a supported match type.`);
+          if (typeof rule.label !== "string" || typeof rule.match !== "string" || rule.label.length > maxCustomLabelLength) {
+            throw new Error(`Rule ${index + 1}: Invalid label or match.`);
+          }
           const normalized = createCustomRule(rule);
           const error = customRuleError(normalized);
           if (error) throw new Error(`Rule ${index + 1}: ${error}`);
@@ -1654,18 +1732,9 @@
         try {
           const saved = localStorage.getItem(customRulesStorageKey);
           if (!saved) return [];
-          const payload = JSON.parse(saved);
-          if (!payload || payload.version !== 1 || !Array.isArray(payload.rules)) return [];
-          return payload.rules.slice(0, maxCustomRules).flatMap((rule) => {
-            if (!rule || typeof rule !== "object" || Array.isArray(rule)) return [];
-            const normalized = createCustomRule({
-              label: typeof rule.label === "string" ? rule.label.slice(0, maxCustomLabelLength) : "",
-              matchType: rule.matchType,
-              match: typeof rule.match === "string" ? rule.match.slice(0, maxCustomMatchLength) : ""
-            });
-            return customRuleError(normalized) ? [] : [normalized];
-          });
+          return parseCustomRuleSet(saved);
         } catch {
+          rulesLoadFailed = true;
           return [];
         }
       }
@@ -1833,6 +1902,8 @@
         customRuleDrafts = cloneCustomRules(customRules);
         rebuildCompiledCustomRules();
         const persisted = saveCustomRules();
+        if (persisted) rulesLoadFailed = false;
+        rulesRecovery.hidden = !rulesLoadFailed;
         showCustomRuleErrors = false;
         renderCustomRules();
         applyCustomRulesToCurrentText();
@@ -1850,6 +1921,7 @@
       }
 
       function openAdvancedFeatures() {
+        hideReviewTooltip();
         customRuleDrafts = cloneCustomRules(customRules);
         showCustomRuleErrors = false;
         discardOverlay.hidden = true;
@@ -1862,6 +1934,7 @@
       }
 
       function closeAdvancedFeatures() {
+        hideReviewTooltip();
         advancedBackdrop.hidden = true;
         document.body.classList.remove("advanced-open");
         document.querySelector?.(".app")?.removeAttribute("inert");
@@ -2014,9 +2087,11 @@
           });
           if (birthColumns.length === 0) continue;
 
-          for (let rowIndex = lineIndex + 1; rowIndex < lines.length; rowIndex += 1) {
-            const rowLine = lines[rowIndex];
-            if (!rowLine.value.trim()) break;
+          let rowStart = lines[lineIndex + 1].start;
+          while (rowStart < text.length) {
+            const rowLine = readDelimitedRecord(text, rowStart, delimiter);
+            if (!rowLine || !rowLine.value.trim()) break;
+            rowStart = rowLine.next;
             const fields = parseDelimitedFields(rowLine.value, delimiter);
             if (fields.length !== headers.length) break;
 
@@ -2040,6 +2115,27 @@
         return matches;
       }
 
+      function readDelimitedRecord(text, start, delimiter) {
+        let inQuotes = false;
+        let fieldStart = true;
+        for (let index = start; index <= text.length; index += 1) {
+          const character = text[index];
+          if (character === '"') {
+            if (inQuotes && text[index + 1] === '"') index += 1;
+            else if (inQuotes) inQuotes = false;
+            else if (fieldStart) inQuotes = true;
+            fieldStart = false;
+          } else if (!inQuotes && character === delimiter) fieldStart = true;
+          else if (character !== " " && character !== "\t") fieldStart = false;
+          if (index === text.length || (character === "\n" && !inQuotes)) {
+            if (inQuotes) return null;
+            const end = text[index - 1] === "\r" ? index - 1 : index;
+            return { value: text.slice(start, end), start, next: index + 1 };
+          }
+        }
+        return null;
+      }
+
       function parseDelimitedFields(line, delimiter) {
         const fields = [];
         let fieldStart = 0;
@@ -2049,10 +2145,16 @@
           if (character === '"') {
             if (inQuotes && line[index + 1] === '"') {
               index += 1;
-            } else {
-              inQuotes = !inQuotes;
-            }
+            } else if (inQuotes) {
+              inQuotes = false;
+              let after = index + 1;
+              while (line[after] === " " || (line[after] === "\t" && delimiter !== "\t")) after += 1;
+              if (after < line.length && line[after] !== delimiter) return [];
+            } else if (!line.slice(fieldStart, index).trim()) {
+              inQuotes = true;
+            } else return [];
           }
+          if (index === line.length && inQuotes) return [];
           if (index < line.length && (character !== delimiter || inQuotes)) continue;
 
           let start = fieldStart;
@@ -2093,7 +2195,7 @@
 
       function nextPlaceholder(type, value, customLabel = "") {
         if (customLabel) {
-          const key = `${type}\u0000${value.toLowerCase()}`;
+          const key = `${type}\u0000${value}`;
           if (placeholderByValue.has(key)) return placeholderByValue.get(key);
           const count = (placeholderCounts.get(type) || 0) + 1;
           placeholderCounts.set(type, count);
@@ -2108,7 +2210,7 @@
         if (type === "USERNAME") return nextSimplePlaceholder(type, "username", value);
         if (type === "URL") return nextUrlPlaceholder(value);
 
-        const key = `${type}\u0000${value.toLowerCase()}`;
+        const key = `${type}\u0000${type === "TOKEN" ? value : value.toLowerCase()}`;
         if (placeholderByValue.has(key)) return placeholderByValue.get(key);
         const count = (placeholderCounts.get(type) || 0) + 1;
         placeholderCounts.set(type, count);
@@ -2146,7 +2248,7 @@
       }
 
       function nextUrlPlaceholder(value) {
-        const key = `URL\u0000${value.toLowerCase()}`;
+        const key = `URL\u0000${value}`;
         if (placeholderByValue.has(key)) return placeholderByValue.get(key);
         const count = (placeholderCounts.get("URL") || 0) + 1;
         placeholderCounts.set("URL", count);
@@ -2182,6 +2284,7 @@
       }
 
       function normalizeDetectorValue(detector, value) {
+        if (detector.verbatim) return { value, offset: 0 };
         if (detector.type === "URL" || detector.type === "TOKEN") {
           const normalized = trimTerminalPunctuation(detector.type, value);
           return normalized ? { value: normalized, offset: 0 } : null;
@@ -2230,7 +2333,7 @@
       function resolveNamePlaceholders(matches) {
         const assignments = new Map();
         const mentions = matches
-          .map((match, index) => ({ index, match, name: parseName(match.value) }))
+          .map((match, index) => ({ index, match, name: match.type === "NAME" ? parseName(match.value) : null }))
           .filter((mention) => mention.match.type === "NAME" && mention.name);
         const clusters = [];
 
@@ -2422,9 +2525,9 @@
 
       class CustomRuleMatchLimitError extends Error {}
 
-      function collectCustomMatches(text) {
+      function collectCustomMatches(text, rules = compiledCustomRules) {
         const matches = [];
-        compiledCustomRules.forEach(({ rule, ruleIndex, pattern }) => {
+        rules.forEach(({ rule, ruleIndex, pattern }) => {
           const label = rule.label.trim();
           const type = `CUSTOM:${label.toLowerCase()}`;
           const priority = customRulePriority - ruleIndex;
@@ -2456,16 +2559,19 @@
           }
 
           pattern.lastIndex = 0;
+          if (pattern.test("")) throw new Error("A custom rule matched empty text. Edit that rule to continue.");
+          pattern.lastIndex = 0;
           let match;
           while ((match = pattern.exec(text)) !== null) {
+            if (!match[0].length) throw new Error("A custom rule matched empty text. Edit that rule to continue.");
             addMatch(match.index, match.index + match[0].length);
           }
         });
         return matches;
       }
 
-      function collectMatches(text) {
-        const matches = collectCustomMatches(text);
+      function collectMatches(text, customMatches = collectCustomMatches(text)) {
+        const matches = [...customMatches];
         for (const [detectorIndex, detector] of detectors.entries()) {
           if (detector.type === "EMAIL" && !text.includes("@")) continue;
           detector.pattern.lastIndex = 0;
@@ -2511,7 +2617,45 @@
         matches.push(...collectDelimitedBirthDateMatches(text, detectors.length));
         const initiallySelected = mergeMatches(matches);
         const propagated = collectPropagatedMatches(text, initiallySelected);
-        return (propagated.length ? mergeMatches(matches.concat(propagated)) : initiallySelected).filter((match) => !match.protect);
+        const selected = propagated.length ? mergeMatches(matches.concat(propagated)) : initiallySelected;
+        return (suggestRedactionsToggle.checked || acceptedSuggestions.size
+          ? mergeMatches(selected.concat(collectEntropySuggestions(text, selected).filter((match) =>
+            suggestRedactionsToggle.checked || acceptedSuggestions.has(suggestionKey(match)))))
+          : selected).filter((match) => !match.protect);
+      }
+
+      function shannonEntropy(value) {
+        const counts = new Map();
+        for (const character of value) counts.set(character, (counts.get(character) || 0) + 1);
+        let entropy = 0;
+        for (const count of counts.values()) {
+          const probability = count / value.length;
+          entropy -= probability * Math.log2(probability);
+        }
+        return entropy;
+      }
+
+      function collectEntropySuggestions(text, selected) {
+        const suggestions = [];
+        // Scan complete tokens so long identifiers never become partial suggestions.
+        const tokens = /[A-Za-z0-9_+\/-]+={0,2}/g;
+        let match;
+        let selectedIndex = 0;
+        while ((match = tokens.exec(text)) !== null) {
+          const value = match[0];
+          if (value.length < 20 || value.length > 256) continue;
+          const start = match.index;
+          const end = start + value.length;
+          if (isIdentifierContinuation(text[start - 1]) || isIdentifierContinuation(text[end])) continue;
+          while (selectedIndex < selected.length && selected[selectedIndex].end <= start) selectedIndex += 1;
+          if (selectedIndex < selected.length && selected[selectedIndex].start < end) continue;
+          if (/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(value)) continue;
+          const threshold = /^[0-9a-f]+$/i.test(value) ? 3 : 4.5;
+          if (shannonEntropy(value) <= threshold) continue;
+          suggestions.push({ start, end, value, type: "TOKEN", label: "possible secret", suggested: true,
+            priority: -1, detectorIndex: detectors.length + 1, protect: false, propagate: false });
+        }
+        return suggestions;
       }
 
       function collectPropagatedMatches(text, selected) {
@@ -2537,13 +2681,14 @@
         for (const [key, entry] of anchorsByValue) {
           if (entry.types.size !== 1) continue;
           const anchor = entry.anchors[0];
+          const anchorRanges = new Set(entry.anchors.map((match) => `${match.start}:${match.end}`));
           let start = 0;
           while ((start = lowerText.indexOf(key, start)) !== -1) {
             const end = start + key.length;
             const before = start > 0 ? text[start - 1] : "";
             const after = end < text.length ? text[end] : "";
-            const isExactAnchor = entry.anchors.some((match) => match.start === start && match.end === end);
-            const isAnchorLabel = entry.anchors.some((match) => (
+            const isExactAnchor = anchorRanges.has(`${start}:${end}`);
+            const isAnchorLabel = !isExactAnchor && entry.anchors.some((match) => (
               start >= match.contextStart
               && end <= match.contextEnd
               && (start !== match.start || end !== match.end)
@@ -2597,7 +2742,7 @@
         return selected;
       }
 
-      function redact(text) {
+      function redact(text, customMatches) {
         const startTime = performance.now();
         placeholderCounts.clear();
         placeholderByValue.clear();
@@ -2605,7 +2750,7 @@
         redactions.clear();
         restoredIds.clear();
 
-        const matches = collectMatches(text);
+        const matches = collectMatches(text, customMatches);
         const namePlaceholders = resolveNamePlaceholders(matches);
         const parts = [];
         let cursor = 0;
@@ -2617,7 +2762,7 @@
           redactions.set(id, { ...match, placeholder });
           parts.push({ kind: "text", value: text.slice(cursor, match.start) });
           parts.push({ kind: "redaction", id });
-          plain += text.slice(cursor, match.start) + placeholder;
+          plain += text.slice(cursor, match.start) + (match.suggested && !acceptedSuggestions.has(`${match.start}:${match.end}:${match.value}`) ? match.value : placeholder);
           cursor = match.end;
         });
 
@@ -2627,7 +2772,8 @@
         return {
           parts,
           plain,
-          count: matches.length,
+          count: matches.filter((match) => !match.suggested).length,
+          suggestions: matches.filter((match) => match.suggested).length,
           elapsed: Math.max(0, performance.now() - startTime)
         };
       }
@@ -2650,11 +2796,9 @@
           }
 
           const item = redactions.get(part.id);
-          const isRestored = restoredIds.has(part.id);
-          const visible = isRestored ? item.value : item.placeholder;
-          const label = isRestored ? "Original text restored. Click to redact." : `${item.label} redaction. Click to restore.`;
+          const { isRestored, isSuggested, visible, label } = chipState(part.id);
           redactedPlainText += visible;
-          html += `<button class="redaction${isRestored ? " restored" : ""}" type="button" data-id="${part.id}" data-reveal="${escapeHtml(item.value)}" aria-label="${escapeHtml(label)}" aria-pressed="${isRestored ? "true" : "false"}">${escapeHtml(visible)}</button>`;
+          html += `<button class="redaction${isSuggested ? " suggested" : isRestored ? " restored" : ""}" type="button" data-id="${part.id}" data-reveal="${escapeHtml(item.value)}" aria-label="${escapeHtml(label)}" aria-pressed="${isRestored ? "true" : "false"}">${escapeHtml(visible)}</button>`;
         }
 
         redactionBox.innerHTML = html;
@@ -2663,7 +2807,61 @@
         }
       }
 
+      function suggestionKey(item) {
+        return `${item.start}:${item.end}:${item.value}`;
+      }
+
+      function chipState(id) {
+        const item = redactions.get(id);
+        const isSuggested = item.suggested && !acceptedSuggestions.has(suggestionKey(item));
+        const isRestored = !isSuggested && restoredIds.has(id);
+        return {
+          isSuggested, isRestored,
+          visible: isSuggested || isRestored ? item.value : item.placeholder,
+          label: isSuggested ? "Suggested redaction. Click to redact." : isRestored
+            ? "Original text restored. Click to redact." : `${item.label} redaction. Click to restore.`
+        };
+      }
+
+      function renderChip(id) {
+        const button = redactionBox.querySelector(`[data-id="${id}"]`);
+        const state = chipState(id);
+        if (button) {
+          button.textContent = state.visible;
+          button.classList.toggle("restored", state.isRestored);
+          button.classList.toggle("suggested", state.isSuggested);
+          button.setAttribute("aria-pressed", String(state.isRestored));
+          button.setAttribute("aria-label", state.label);
+        }
+        redactedPlainText = currentResult.parts.map((part) => part.kind === "text" ? part.value : chipState(part.id).visible).join("");
+        updateStatus(currentResult);
+      }
+
+      function hideReviewTooltip() {
+        window.clearTimeout(tooltipHideTimer);
+        tooltipTarget?.removeAttribute("aria-describedby");
+        tooltipTarget = null;
+        reviewTooltip.hidden = true;
+      }
+
+      function showReviewTooltip(target) {
+        if (!target) return;
+        hideReviewTooltip();
+        tooltipTarget = target;
+        reviewTooltip.textContent = target.dataset.help || (target.classList.contains("suggested")
+          ? "Possible secret. Click to redact." : target.dataset.reveal);
+        reviewTooltip.hidden = false;
+        target.setAttribute("aria-describedby", "reviewTooltip");
+        const anchor = target.getBoundingClientRect();
+        const bounds = reviewTooltip.getBoundingClientRect();
+        reviewTooltip.style.left = `${Math.max(8, Math.min(window.innerWidth - bounds.width - 8, anchor.left))}px`;
+        const bottom = Math.min(window.innerHeight - 8, target.closest(".redaction") ? redactionBox.getBoundingClientRect().bottom : window.innerHeight - 8);
+        reviewTooltip.style.top = `${Math.max(8, Math.min(window.innerHeight - bounds.height - 8,
+          anchor.bottom + 8 + bounds.height <= bottom ? anchor.bottom + 8 : anchor.top - bounds.height - 8))}px`;
+      }
+
       function showInputMode({ focus = true, selectionStart = null, selectionEnd = null } = {}) {
+        hideReviewTooltip();
         editorInput.hidden = false;
         redactionBox.hidden = true;
         editorInput.value = rawSourceText;
@@ -2682,16 +2880,24 @@
 
       function updateStatus(result) {
         const charLabel = rawSourceText.length === 1 ? "character" : "characters";
-        if (!rawSourceText) {
+        const chars = `<strong>${rawSourceText.length.toLocaleString()}</strong> ${charLabel}`;
+        if (result.skipped) {
+          statusText.innerHTML = `${chars}. ${result.reason === "size"
+            ? `Redaction skipped; limit is <strong>${maxRedactionCharacters.toLocaleString()}</strong> characters`
+            : result.reason === "saved-rules" ? "Saved rules need attention" : "Redaction skipped; review custom rules"}`;
+        } else if (!rawSourceText) {
           statusText.innerHTML = `<strong>0</strong> characters, <strong>0</strong> redactions`;
-        } else if (result.skipped) {
-          statusText.innerHTML = result.reason === "custom-match-limit"
-            ? `<strong>${rawSourceText.length.toLocaleString()}</strong> ${charLabel}. Redaction skipped; a custom rule exceeded <strong>${maxCustomMatches.toLocaleString()}</strong> matches`
-            : `<strong>${rawSourceText.length.toLocaleString()}</strong> ${charLabel}. Redaction skipped; limit is <strong>${maxRedactionCharacters.toLocaleString()}</strong> characters`;
         } else if (result.pending) {
-          statusText.innerHTML = `<strong>${rawSourceText.length.toLocaleString()}</strong> ${charLabel}`;
+          statusText.innerHTML = `${chars}${pendingJob ? ", checking custom rules…" : ""}`;
         } else {
-          statusText.innerHTML = `<strong>${rawSourceText.length.toLocaleString()}</strong> ${charLabel}, <strong>${result.count.toLocaleString()}</strong> redactions applied in <strong>${result.elapsed.toFixed(1)} ms</strong>`;
+          let count = 0;
+          let suggestions = 0;
+          for (const id of redactions.keys()) {
+            const state = chipState(id);
+            if (state.isSuggested) suggestions += 1;
+            else if (!state.isRestored) count += 1;
+          }
+          statusText.innerHTML = `${chars}, <strong>${count.toLocaleString()}</strong> redactions${suggestions ? `, <strong>${suggestions}</strong> suggested` : ""} in <strong>${result.elapsed.toFixed(1)} ms</strong>`;
         }
         copyButton.disabled = !rawSourceText || result.skipped;
       }
@@ -2749,72 +2955,132 @@
         pasteTextAt(text, item ? item.end : rawSourceText.length);
       }
 
+      function cancelPendingProcessing() {
+        processingGeneration += 1;
+        pendingJob?.cancel();
+        pendingJob = null;
+      }
+
+      function runCustomRules(text) {
+        let worker;
+        let url;
+        let timer;
+        let finish;
+        let settled = false;
+        const promise = new Promise((resolve, reject) => {
+          finish = (error, matches) => {
+            if (settled) return;
+            settled = true;
+            window.clearTimeout(timer);
+            worker?.terminate();
+            if (url) URL.revokeObjectURL(url);
+            if (error) reject(error);
+            else resolve(matches);
+          };
+          try {
+            const code = `"use strict";
+              const maxCustomMatches = ${maxCustomMatches};
+              const customRulePriority = ${customRulePriority};
+              ${CustomRuleMatchLimitError.toString()}
+              ${collectCustomMatches.toString()}
+              self.onmessage = ({data}) => {
+                try {
+                  const rules = data.rules.map((rule, ruleIndex) => ({rule, ruleIndex,
+                    pattern: rule.matchType === "regex" ? new RegExp(rule.match, "gu") : null}));
+                  self.postMessage({matches: collectCustomMatches(data.text, rules)});
+                } catch (error) {
+                  self.postMessage({error: error instanceof CustomRuleMatchLimitError
+                    ? "A custom rule exceeded the match limit. Edit that rule to continue."
+                    : error instanceof RangeError ? "A custom rule used too many resources. Edit or remove that rule to continue." : error.message});
+                }
+              };`;
+            url = URL.createObjectURL(new Blob([code], {type: "text/javascript"}));
+            worker = new Worker(url);
+            timer = window.setTimeout(() => finish(new Error("A custom rule took too long. Edit or remove that rule to continue.")), customRegexDeadlineMs);
+            worker.onmessage = ({data}) => finish(data.error ? new Error(data.error) : null, data.matches);
+            worker.onerror = (event) => {
+              event.preventDefault();
+              finish(new Error("Custom rules could not run. Try again or edit your rules."));
+            };
+            worker.onmessageerror = () => finish(new Error("Custom rules could not run. Try again or edit your rules."));
+            worker.postMessage({text, rules: customRules.map(portableCustomRule)});
+          } catch {
+            finish(new Error("Custom rules could not run. Try again or edit your rules."));
+          }
+        });
+        return {promise, cancel: () => finish(null, null)};
+      }
+
+      function clearOutput() {
+        hideReviewTooltip();
+        redactions.clear();
+        restoredIds.clear();
+        redactedPlainText = "";
+        redactionBox.innerHTML = "";
+      }
+
+      function skipRedaction(reason, message) {
+        clearOutput();
+        currentResult = {parts: [], plain: "", count: 0, elapsed: 0, skipped: true, reason};
+        updateStatus(currentResult);
+        showInputMode({focus: false});
+        setCopyState(message, true);
+        return currentResult;
+      }
+
       function processRawText(text, { autoCopy = true, render = true } = {}) {
         window.clearTimeout(inputRenderTimer);
         window.clearTimeout(autoCopyTimer);
+        cancelPendingProcessing();
+        const generation = processingGeneration;
+        if (text !== rawSourceText) acceptedSuggestions.clear();
         rawSourceText = text;
-        if (rawSourceText.length > maxRedactionCharacters) {
-          redactions.clear();
-          restoredIds.clear();
-          redactedPlainText = "";
-          redactionBox.innerHTML = "";
-          currentResult = {
-            parts: [],
-            plain: "",
-            count: 0,
-            elapsed: 0,
-            skipped: true
-          };
-          updateStatus(currentResult);
-          if (render || editorInput.hidden) {
-            showInputMode({ focus: false });
-          } else {
-            editorInput.value = rawSourceText;
+        if (rulesLoadFailed) return skipRedaction("saved-rules", "Saved rules need attention. Open Advanced features.");
+        if (text.length > maxRedactionCharacters) return skipRedaction("size", "Text too large to redact");
+        setCopyState("");
+        const started = performance.now();
+        const complete = (matches) => {
+          if (generation !== processingGeneration) return null;
+          pendingJob = null;
+          try {
+            currentResult = redact(text, matches);
+          } catch (error) {
+            return skipRedaction("custom-rule", error instanceof CustomRuleMatchLimitError
+              ? "A custom rule exceeded the match limit. Edit that rule to continue."
+              : "Redaction could not finish. Review your text and rules.");
           }
-          return currentResult;
-        }
-
-        if (copyState.textContent === "Text too large to redact" || copyState.textContent === "Redaction skipped") {
-          setCopyState("");
-        }
-        try {
-          currentResult = redact(rawSourceText);
-        } catch (error) {
-          if (!(error instanceof CustomRuleMatchLimitError)) throw error;
-          redactions.clear();
-          restoredIds.clear();
-          redactedPlainText = "";
-          redactionBox.innerHTML = "";
-          currentResult = {
-            parts: [],
-            plain: "",
-            count: 0,
-            elapsed: 0,
-            skipped: true,
-            reason: "custom-match-limit"
-          };
+          currentResult.elapsed = Math.max(0, performance.now() - started);
+          redactedPlainText = currentResult.plain;
+          if (render) {
+            renderResult(currentResult);
+            showRedactionMode();
+          }
           updateStatus(currentResult);
-          showInputMode({ focus: false });
-          setCopyState("Redaction skipped", true);
+          if (autoCopy && text && autoCopyEnabled()) queueAutoCopy();
+          if (!text) showInputMode({focus: false});
           return currentResult;
-        }
-        redactedPlainText = currentResult.plain;
-        if (render) {
-          renderResult(currentResult);
-          showRedactionMode();
-        }
-        updateStatus(currentResult);
-        if (autoCopy && rawSourceText && autoCopyEnabled()) queueAutoCopy();
-        if (!rawSourceText) {
-          setCopyState("");
-          showInputMode({ focus: false });
-        }
-        return currentResult;
+        };
+        if (!text) return complete([]);
+        if (!customRules.some((rule) => rule.matchType === "regex")) return complete();
+        clearOutput();
+        currentResult = null;
+        showInputMode({focus: false});
+        const job = runCustomRules(text);
+        pendingJob = job;
+        updateStatus({pending: true});
+        job.promise = job.promise.then((matches) => matches === null ? null : complete(matches)).catch((error) => {
+          if (generation !== processingGeneration) return null;
+          pendingJob = null;
+          return skipRedaction("custom-rule", error.message);
+        });
+        return job.promise;
       }
 
       function queueTypedRedaction() {
         window.clearTimeout(inputRenderTimer);
         window.clearTimeout(autoCopyTimer);
+        cancelPendingProcessing();
+        acceptedSuggestions.clear();
         rawSourceText = editorInput.value;
         currentResult = null;
         redactedPlainText = "";
@@ -2829,12 +3095,17 @@
         updateStatus({ pending: true });
         inputRenderTimer = window.setTimeout(() => {
           if (editorInput.hidden) return;
-          const result = processRawText(editorInput.value, { autoCopy: false, render: false });
-          if (!result.skipped && result.count > 0) {
-            renderResult(result);
-            showRedactionMode();
-            if (autoCopyEnabled()) queueAutoCopy();
-          }
+          const processed = processRawText(editorInput.value, { autoCopy: false, render: false });
+          const reveal = (result) => {
+            if (!result || result !== currentResult || result.skipped) return;
+            if (result.count > 0 || result.suggestions > 0) {
+              renderResult(result);
+              showRedactionMode();
+              if (autoCopyEnabled()) queueAutoCopy();
+            }
+          };
+          if (processed instanceof Promise) processed.then(reveal);
+          else reveal(processed);
         }, 650);
       }
 
@@ -2848,34 +3119,37 @@
 
       async function copyRedacted({ automatic = false } = {}) {
         if (automatic && !autoCopyEnabled()) return;
+        if (rulesLoadFailed) {
+          setCopyState("Saved rules need attention. Open Advanced features.", true);
+          return;
+        }
         if (automatic && restoredIds.size > 0) {
           setCopyState("Copy available");
           return;
         }
-
-        if (!editorInput.hidden) {
-          processRawText(editorInput.value, { autoCopy: false, render: true });
+        let processed = pendingJob?.promise;
+        if (!processed && !editorInput.hidden) processed = processRawText(editorInput.value, {autoCopy: false, render: true});
+        const generation = processingGeneration;
+        if (processed instanceof Promise) {
+          const result = await processed;
+          if (!result || generation !== processingGeneration) return;
+          if (!result.skipped) { renderResult(result); showRedactionMode(); }
         }
-
-        if (currentResult?.skipped) {
-          setCopyState("Redaction skipped", true);
+        if (currentResult?.skipped) return;
+        const unreviewed = [...redactions.keys()].some((id) => chipState(id).isSuggested);
+        if (automatic && (unreviewed || restoredIds.size > 0)) {
+          setCopyState(unreviewed ? "Review yellow suggestions before copying" : "Copy available", unreviewed);
           return;
         }
-
-        if (!redactedPlainText) {
-          setCopyState("Nothing to copy", true);
-          return;
-        }
-
+        if (!redactedPlainText) { setCopyState("Nothing to copy", true); return; }
+        const text = redactedPlainText;
         try {
-          await navigator.clipboard.writeText(redactedPlainText);
-          setCopyState(automatic ? "Auto copied redacted text" : "Copied redacted text");
+          await navigator.clipboard.writeText(text);
+          if (generation === processingGeneration) setCopyState(unreviewed ? "Copied; yellow suggestions kept as text" : automatic ? "Auto copied redacted text" : "Copied redacted text");
         } catch {
-          if (automatic) {
-            setCopyState("Copy available", false);
-            return;
-          }
-          legacyCopy(redactedPlainText);
+          if (generation !== processingGeneration) return;
+          if (automatic) { setCopyState("Copy available"); return; }
+          legacyCopy(text);
         }
       }
 
@@ -2910,8 +3184,10 @@
       }
 
       async function pasteFromClipboard() {
+        const generation = processingGeneration;
         try {
           const text = await navigator.clipboard.readText();
+          if (generation !== processingGeneration) return;
           if (editorInput.hidden) {
             pasteTextAt(text, rawSourceText.length);
           } else {
@@ -2939,12 +3215,16 @@
         }
         const id = button.dataset.id;
         if (!redactions.has(id)) return;
-        if (restoredIds.has(id)) {
+        const item = redactions.get(id);
+        if (chipState(id).isSuggested) {
+          acceptedSuggestions.add(suggestionKey(item));
+        } else if (restoredIds.has(id)) {
           restoredIds.delete(id);
         } else {
           restoredIds.add(id);
         }
-        renderResult(currentResult, { focusId: id });
+        hideReviewTooltip();
+        renderChip(id);
         copyRedacted({ automatic: true });
       });
 
@@ -3128,7 +3408,65 @@
         setCopyState(autoCopyToggle.checked ? "Auto-copy on" : "Auto-copy off");
       });
 
+      for (const eventName of ["pointerover", "focusin"]) {
+        redactionBox.addEventListener(eventName, (event) => showReviewTooltip(event.target.closest(".redaction")));
+        suggestionsInfo.addEventListener(eventName, () => showReviewTooltip(suggestionsInfo));
+      }
+      const deferHideTooltip = () => {
+        window.clearTimeout(tooltipHideTimer);
+        tooltipHideTimer = window.setTimeout(hideReviewTooltip, 150);
+      };
+      for (const element of [redactionBox, suggestionsInfo, reviewTooltip]) {
+        element.addEventListener("pointerleave", deferHideTooltip);
+        element.addEventListener("focusout", hideReviewTooltip);
+      }
+      redactionBox.addEventListener("pointerout", (event) => {
+        if (event.target.closest(".redaction") && !event.relatedTarget?.closest?.(".redaction")) deferHideTooltip();
+      });
+      reviewTooltip.addEventListener("pointerenter", () => window.clearTimeout(tooltipHideTimer));
+      suggestionsInfo.addEventListener("click", () => showReviewTooltip(suggestionsInfo));
+      window.addEventListener("resize", hideReviewTooltip);
+      document.addEventListener("scroll", (event) => {
+        if (event.target !== reviewTooltip) hideReviewTooltip();
+      }, true);
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && !reviewTooltip.hidden) {
+          hideReviewTooltip();
+          event.preventDefault();
+          event.stopPropagation();
+        }
+      }, true);
+
+      rulesResetButton.addEventListener("click", () => {
+        if (!window.confirm("Reset saved custom rules? This removes the saved rules. Import a backup instead if you have one.")) return;
+        try {
+          localStorage.removeItem(customRulesStorageKey);
+        } catch {
+          setRulesStatus("Could not reset saved rules. Allow browser storage and try again.", true);
+          return;
+        }
+        rulesLoadFailed = false;
+        rulesRecovery.hidden = true;
+        customRules = [];
+        customRuleDrafts = [];
+        rebuildCompiledCustomRules();
+        renderCustomRules();
+        processRawText(rawSourceText, {autoCopy: false, render: true});
+        setRulesStatus("Saved rules reset.");
+      });
+
+      try { suggestRedactionsToggle.checked = localStorage.getItem(suggestionsStorageKey) === "on"; }
+      catch { suggestRedactionsToggle.checked = false; }
+      suggestRedactionsToggle.addEventListener("change", () => {
+        let persisted = true;
+        try { localStorage.setItem(suggestionsStorageKey, suggestRedactionsToggle.checked ? "on" : "off"); }
+        catch { persisted = false; }
+        processRawText(rawSourceText, {autoCopy: false, render: true});
+        if (!persisted) setRulesStatus("Suggestion setting applies to this session only.", true);
+      });
+
       customRules = loadCustomRules();
+      rulesRecovery.hidden = !rulesLoadFailed;
       customRuleDrafts = cloneCustomRules(customRules);
       rebuildCompiledCustomRules();
       renderCustomRules();
