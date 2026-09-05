@@ -7,6 +7,7 @@
 # Public app and docs.
 !/README.md
 !/index.html
+!/_headers
 
 # Public assets that are intentionally shipped.
 !/assets/
